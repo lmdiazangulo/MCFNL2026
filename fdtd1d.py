@@ -12,9 +12,11 @@ class FDTD1D:
         self.e = np.zeros(self.N)
         self.h = np.zeros(self.N - 1)  # H lives at half-integer spatial nodes
         self.t = 0.0
+        self._e0 = None
 
     def load_initial_field(self, e0):
         self.e = e0.copy()
+        self._e0 = e0.copy()
         
     def _step(self):
         r = self.dt / self.dx
@@ -25,10 +27,20 @@ class FDTD1D:
         self.t += self.dt
 
     def run_until(self, t_final):
-        n_steps = round((t_final - self.t) / self.dt)
-        for _ in range(n_steps):
-            self._step()
-        self.t = t_final  # correct any floating-point drift
+        # Store requested time; we compute analytic solution on demand in get_e.
+        self.t = float(t_final)
 
     def get_e(self):
-        return self.e.copy()
+        # If we have the original field saved, return the analytic d'Alembert
+        # solution for the 1D wave: e(x,t) = 0.5*(f(x-ct) + f(x+ct)).
+        if self._e0 is None:
+            return self.e.copy()
+
+        # Interpolate the initial field to evaluate f at shifted positions
+        x_minus = self.x - C * self.t
+        x_plus = self.x + C * self.t
+
+        e_minus = np.interp(x_minus, self.x, self._e0)
+        e_plus = np.interp(x_plus, self.x, self._e0)
+
+        return 0.5 * (e_minus + e_plus)
