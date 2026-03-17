@@ -55,6 +55,32 @@ def test_fdtd_PEC_boundary_conditions():
     assert np.corrcoef(e_solved, e_expected)[0,1] > 0.99
     assert np.corrcoef(h_solved, h_expected)[0,1] > 0.99 
 
+def test_fdtd_PMC_boundary_conditions():
+    xMax = 1
+    xMin = -1
+    x = np.linspace(xMin, xMax, 201)
+    boundaries = ('PEC', 'PEC')
+    
+    x0 = 0.0
+    sigma = 0.05
+    initial_e = gaussian(x, x0, sigma)
+    fdtd.load_initial_field(initial_e)
+    
+    fdtd = FDTD1D(x, boundaries)
+
+    L = xMax - xMin
+    t_final = L / C
+    fdtd.run_until(t_final)
+
+    e_solved = fdtd.get_e()
+    h_solved = fdtd.get_h()
+
+    e_expected = - initial_e
+    h_expected = np.zeros_like(h_solved)
+    
+    assert np.corrcoef(e_solved, e_expected)[0,1] > 0.99
+    assert np.corrcoef(h_solved, h_expected)[0,1] > 0.99 
+
 
 if __name__ == "__main__":
     pytest.main([__file__])
