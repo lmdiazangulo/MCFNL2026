@@ -61,6 +61,7 @@ def test_fdtd_PMC_boundary_conditions():
     x = np.linspace(xMin, xMax, 201)
     boundaries = ('PEC', 'PEC')
     
+    
     x0 = 0.0
     sigma = 0.05
     initial_e = gaussian(x, x0, sigma)
