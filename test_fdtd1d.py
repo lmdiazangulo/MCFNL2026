@@ -38,9 +38,9 @@ def test_fdtd_PEC_boundary_conditions():
     x0 = 0.0
     sigma = 0.05
     initial_e = gaussian(x, x0, sigma)
-    fdtd.load_initial_field(initial_e)
-    
+
     fdtd = FDTD1D(x, boundaries)
+    fdtd.load_initial_field(initial_e)
 
     L = xMax - xMin
     t_final = L / C
@@ -53,7 +53,7 @@ def test_fdtd_PEC_boundary_conditions():
     h_expected = np.zeros_like(h_solved)
     
     assert np.corrcoef(e_solved, e_expected)[0,1] > 0.99
-    assert np.corrcoef(h_solved, h_expected)[0,1] > 0.99 
+    assert np.allclose(h_solved, h_expected, atol=0.01)
 
 def test_fdtd_PMC_boundary_conditions():
     xMax = 1
