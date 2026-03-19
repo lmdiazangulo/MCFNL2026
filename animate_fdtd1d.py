@@ -23,8 +23,8 @@ from pathlib import Path
 def make_animation(
     x,
     initial_field,
-    t_final=0.5,
-    n_frames=100,
+    t_final=2.0,
+    n_frames=200,
     outfile="fdtd1d.gif",
     show=False,
 ):
@@ -35,14 +35,27 @@ def make_animation(
 
     fdtd = FDTD1D(x)
     fdtd.load_initial_field(initial_field)
+    # Initialize H to zero so it can be animated as well
+    fdtd.load_initial_field(np.zeros_like(x[:-1]))
 
-    fig, ax = plt.subplots()
-    line, = ax.plot(x, initial_field, lw=2)
-    ax.set_xlim(x.min(), x.max())
-    ax.set_ylim(initial_field.min() * 1.2, initial_field.max() * 1.2)
-    ax.set_xlabel("x")
-    ax.set_ylabel("E(x, t)")
-    title = ax.set_title("")
+    fig, (ax_e, ax_h) = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
+
+    line_e, = ax_e.plot(x, initial_field, lw=2)
+    ax_e.set_ylabel("E(x, t)")
+    ax_e.grid(alpha=0.3)
+
+    line_h, = ax_h.plot(x[:-1], fdtd.get_h(), lw=2)
+    ax_h.set_ylabel("H(x, t)")
+    ax_h.set_xlabel("x")
+    ax_h.grid(alpha=0.3)
+
+    title = fig.suptitle("")
+
+    # Set reasonable limits based on initial fields
+    e_lim = np.max(np.abs(initial_field))
+    h_lim = np.max(np.abs(fdtd.get_h()))
+    ax_e.set_ylim(-1.1 * e_lim, 1.1 * e_lim)
+    ax_h.set_ylim(-1.1 * (h_lim if h_lim > 0 else 1.0), 1.1 * (h_lim if h_lim > 0 else 1.0))
 
     times = np.linspace(0.0, t_final, n_frames)
 
@@ -50,9 +63,11 @@ def make_animation(
         t = times[frame_index]
         fdtd.run_until(t)
         e = fdtd.get_e()
-        line.set_data(x, e)
+        h = fdtd.get_h()
+        line_e.set_data(x, e)
+        line_h.set_data(x[:-1], h)
         title.set_text(f"t = {t:.3f}")
-        return line, title
+        return line_e, line_h, title
 
     anim = FuncAnimation(fig, update, frames=len(times), blit=True)
 
@@ -74,5 +89,12 @@ if __name__ == "__main__":
     # Use a proper Gaussian peak (decays away from center)
     initial_e = np.exp(-0.5 * ((x - x0) / sigma) ** 2)
 
-    out = make_animation(x, initial_e, t_final=0.3, n_frames=120, outfile="fdtd1d.gif", show=True)
+    out = make_animation(
+        x,
+        initial_e,
+        t_final=2.0,
+        n_frames=200,
+        outfile="fdtd1d.gif",
+        show=True,
+    )
     print(f"Saved animation: {out}")
