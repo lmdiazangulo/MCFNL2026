@@ -99,18 +99,24 @@ def test_fdtd_PMC_boundary_conditions():
     fdtd.load_initial_field(initial_e)
     fdtd.h = initial_h.copy()
 
+    # import matplotlib.pyplot as plt
+    # plt.plot(fdtd.x, fdtd.e, label='E')
+    # plt.plot(fdtd.xH, fdtd.h, label='H')
+    # plt.legend()
+    # plt.show()
+
     L = xMax - xMin
     t_final = L / C
     fdtd.run_until(t_final)
 
-    e_solved = fdtd.get_e()
-    h_solved = fdtd.get_h()
+    # plt.plot(fdtd.x, fdtd.e)
+    # plt.show()
 
-    h_expected = - initial_h
+    e_solved = fdtd.get_e()
+
     e_expected = np.zeros_like(e_solved)
 
-    assert np.corrcoef(h_solved, h_expected)[0,1] > 0.99
-    assert np.max(np.abs(e_solved - e_expected)) < 0.2
+    assert np.max(np.abs(e_solved - e_expected)) < 1e-8
 
 def test_fdtd_total_spread_field():
     xMax = 1
@@ -119,27 +125,30 @@ def test_fdtd_total_spread_field():
 
     x = np.linspace(xMin,xMax,201)
     xH = (x[1:] + x[:-1]) / 2.0
-    boundaries = ('PEC','PEC') 
+    boundaries = ('mur','mur') 
     x_o = 0
-    initial_e = np.zeros_like(x)
-
+    
     def my_pert(t):
-        return np.sin(t)
+        return gaussian(t, 1, 0.2)
 
     fdtd = FDTD1D(x,boundaries,x_o,pert = lambda t: my_pert(t))
-    fdtd.load_initial_field(initial_e)
-    t_final = L / C
-    fdtd.run_until(t_final)
-
-    e_solved = fdtd.get_e()
-    h_solved = fdtd.get_h()
-
-    e_expected = np.sin(x - L)
-    h_expected = np.sin(xH - L)
     
-    assert np.corrcoef(e_solved, e_expected)[0,1] > -0.6
-    assert np.corrcoef(h_solved, h_expected)[0,1] > 0.8
+    assert np.allclose(fdtd.e, np.zeros_like(fdtd.e))
 
+    # import matplotlib.pyplot
+    # plt.plot(fdtd.x, fdtd.e)
+
+    t_final = 2* L / C
+    fdtd.run_until(1.5)
+    # plt.plot(fdtd.x, fdtd.e)
+
+    assert np.isclose(np.max(fdtd.e), 0.5)
+
+    fdtd.run_until(t_final)
+    # plt.plot(fdtd.x, fdtd.e)
+
+    assert np.allclose(fdtd.e, np.zeros_like(fdtd.e))
+    
 def test_fdtd_mur_boundary_conditions():
     xMax = 1
     xMin = -1
