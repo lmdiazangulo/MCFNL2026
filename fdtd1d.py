@@ -7,7 +7,7 @@ def gaussian(x, x0, sigma):
 
 
 class FDTD1D:
-    def __init__(self, x, boundaries=None):
+    def __init__(self, x, boundaries=None, epsilon=1.0, sigma=0.0):
         self.x = x
         self.xH = (self.x[:1] + self.x[:-1]) / 2.0
         self.dx = x[1] - x[0]
@@ -17,6 +17,16 @@ class FDTD1D:
         self.h = np.zeros(self.N - 1) 
         self.t = 0.0
         self.boundaries = boundaries
+
+        # Allow epsilon and sigma to be scalars or arrays (per node)
+        if np.isscalar(epsilon):
+            self.epsilon = np.full(self.N, epsilon)
+        else:
+            self.epsilon = np.array(epsilon, dtype=float)
+        if np.isscalar(sigma):
+            self.sigma = np.full(self.N, sigma)
+        else:
+            self.sigma = np.array(sigma, dtype=float)
 
     def load_initial_field(self, e0):
         self.e = e0.copy()
@@ -33,7 +43,14 @@ class FDTD1D:
                 e_old_right_0 = self.e[-1]
                 e_old_right_1 = self.e[-2]
 
-        self.e[1:-1] += r * (self.h[1:] - self.h[:-1])
+        eps = self.epsilon[1:-1]
+        sig = self.sigma[1:-1]
+        self.e[1:-1] = (
+            (eps - sig * self.dt / 2) / 
+            (eps + sig * self.dt / 2) * self.e[1:-1]
+            + self.dt / (eps + sig * self.dt / 2) 
+            * (self.h[1:] - self.h[:-1]) / self.dx
+        )
 
         if self.boundaries is not None:
             if self.boundaries[0] == 'PEC':

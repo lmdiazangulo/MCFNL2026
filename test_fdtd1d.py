@@ -113,5 +113,47 @@ def test_fdtd_mur_boundary_conditions():
     assert np.allclose(h_solved, 0.0, atol=1e-2)
 
 
+def test_fdtd_conductive_medium():
+
+    N = 401
+    x = np.linspace(-2, 2, N)
+    xH = (x[1:] + x[:-1]) / 2.0
+
+    epsilon = np.ones(N)
+    epsilon2 = 4.0
+    interface_idx = N // 2
+    epsilon[interface_idx:] = epsilon2
+
+    x0 = -1.0
+    sig = 0.08
+
+    initial_e = gaussian(x, x0, sig)
+    initial_h = -gaussian(xH, x0, sig)
+
+    fdtd = FDTD1D(x, ('mur', 'mur'), epsilon=epsilon, sigma=0.0)
+    fdtd.load_initial_field(initial_e)
+    fdtd.h = initial_h.copy()
+
+    t_final = 2.0
+    fdtd.run_until(t_final)
+
+    e_solved = fdtd.get_e()
+
+    eta1 = 1.0 / np.sqrt(1.0)
+    eta2 = 1.0 / np.sqrt(epsilon2)
+    Gamma = (eta2 - eta1) / (eta2 + eta1)
+
+    left_mask = x < -0.5
+    e_left = e_solved[left_mask]
+    peak_idx = np.argmax(np.abs(e_left))
+    measured_peak = e_left[peak_idx]
+
+    # Reflected pulse must be inverted (negative)
+    assert measured_peak < 0
+
+    # Amplitude must match |Gamma| within 5%
+    assert abs(measured_peak / Gamma - 1) < 0.05
+
+
 if __name__ == "__main__":
     pytest.main([__file__])

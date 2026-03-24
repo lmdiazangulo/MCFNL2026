@@ -184,4 +184,118 @@ anim_mur = FuncAnimation(
 
 plt.close(fig_mur)
 HTML(anim_mur.to_jshtml())
+
+# %% [markdown]
+# ## Conductive medium – Reflection at a dielectric interface
+#
+# A purely **right-traveling** Gaussian pulse in vacuum (ε=1) hits an
+# interface at x=0 with a denser dielectric (ε=4).
+#
+# The reflected pulse is **inverted** with amplitude equal to the
+# reflection coefficient Γ = (η₂ − η₁)/(η₂ + η₁) = −1/3.
+# A transmitted pulse continues into the medium at reduced speed.
+
+# %% Parameters (conductive)
+N_cond = 401
+x_cond = np.linspace(-2.0, 2.0, N_cond)
+xH_cond = (x_cond[1:] + x_cond[:-1]) / 2.0
+
+epsilon_cond = np.ones(N_cond)
+epsilon2 = 4.0
+interface_idx = N_cond // 2
+epsilon_cond[interface_idx:] = epsilon2
+
+x0_cond    = -1.0
+sigma_cond = 0.08
+
+# Right-traveling wave: H = -E
+e0_cond = np.exp(-0.5 * ((x_cond  - x0_cond) / sigma_cond) ** 2)
+h0_cond = -np.exp(-0.5 * ((xH_cond - x0_cond) / sigma_cond) ** 2)
+
+n_frames_cond     = 300
+dt_per_frame_cond = 0.01
+
+# %% Run simulation (conductive)
+from fdtd1d import gaussian
+
+fdtd_cond = FDTD1D(x_cond, boundaries=('mur', 'mur'),
+                    epsilon=epsilon_cond, sigma=0.0)
+fdtd_cond.load_initial_field(e0_cond)
+fdtd_cond.h = h0_cond.copy()
+
+frames_e_cond = []
+frames_h_cond = []
+times_cond    = []
+
+frames_e_cond.append(fdtd_cond.get_e())
+frames_h_cond.append(fdtd_cond.get_h())
+times_cond.append(fdtd_cond.t)
+
+for _ in range(n_frames_cond - 1):
+    fdtd_cond.run_until(fdtd_cond.t + dt_per_frame_cond)
+    frames_e_cond.append(fdtd_cond.get_e())
+    frames_h_cond.append(fdtd_cond.get_h())
+    times_cond.append(fdtd_cond.t)
+
+print(f"Conductive – Captured {len(frames_e_cond)} frames  "
+      f"(t = {times_cond[0]:.3f} … {times_cond[-1]:.3f})")
+
+# %% Animate (conductive)
+eta1 = 1.0 / np.sqrt(1.0)
+eta2 = 1.0 / np.sqrt(epsilon2)
+Gamma = (eta2 - eta1) / (eta2 + eta1)
+
+fig_cond, ax_cond = plt.subplots(figsize=(8, 4))
+
+ax_cond.set_xlim(x_cond[0], x_cond[-1])
+ax_cond.set_ylim(-1.5, 1.5)
+ax_cond.set_xlabel("x")
+ax_cond.set_ylabel("Field amplitude")
+ax_cond.set_title(
+    f"1-D FDTD – Reflection at dielectric interface "
+    f"(ε₁=1, ε₂={epsilon2:.0f}, Γ={Gamma:.3f})")
+ax_cond.grid(True, alpha=0.3)
+
+# Mark the interface and shade the dielectric region
+ax_cond.axvline(0.0, color="green", ls="-", lw=2, label="Interface (x=0)")
+ax_cond.axvspan(0.0, x_cond[-1], alpha=0.08, color="green")
+ax_cond.text(0.15, 1.0, f"ε = {epsilon2:.0f}", fontsize=10, color="green")
+ax_cond.text(-1.5, 1.0, "ε = 1 (vacuum)", fontsize=10, color="gray")
+
+# Mur boundaries
+ax_cond.axvline(x_cond[0],  color="red", ls="--", lw=1, alpha=0.5)
+ax_cond.axvline(x_cond[-1], color="red", ls="--", lw=1, alpha=0.5)
+
+(line_e_cond,) = ax_cond.plot([], [], lw=2, color="royalblue", label="E(x, t)")
+(line_h_cond,) = ax_cond.plot([], [], lw=1.5, color="darkorange", label="H(x, t)")
+ax_cond.legend(loc="upper right", fontsize=9)
+
+time_txt_cond = ax_cond.text(0.02, 0.93, "", transform=ax_cond.transAxes, fontsize=10)
+
+
+def init_cond():
+    line_e_cond.set_data([], [])
+    line_h_cond.set_data([], [])
+    time_txt_cond.set_text("")
+    return line_e_cond, line_h_cond, time_txt_cond
+
+
+def update_cond(frame_idx):
+    line_e_cond.set_data(x_cond, frames_e_cond[frame_idx])
+    line_h_cond.set_data(xH_cond, frames_h_cond[frame_idx])
+    time_txt_cond.set_text(f"t = {times_cond[frame_idx]:.3f}")
+    return line_e_cond, line_h_cond, time_txt_cond
+
+
+anim_cond = FuncAnimation(
+    fig_cond,
+    update_cond,
+    frames=len(frames_e_cond),
+    init_func=init_cond,
+    interval=40,
+    blit=True,
+)
+
+plt.close(fig_cond)
+HTML(anim_cond.to_jshtml())
 # %%
