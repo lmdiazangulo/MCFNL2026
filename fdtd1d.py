@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 C = 1.0
 
@@ -7,6 +8,7 @@ def gaussian(x, x0, sigma):
 
 
 class FDTD1D:
+    # Inicia parámetros de la clase
     def __init__(self, x, boundaries=None, x_o=None, pert=None):
         self.x = x
         self.xH = (self.x[1:] + self.x[:-1]) / 2.0
@@ -20,9 +22,11 @@ class FDTD1D:
         self.x_o = x_o
         self.pert = pert
 
+    # Cambia el estado del campo inicial a lo que se le pase
     def load_initial_field(self, e0):
         self.e = e0.copy()
-        
+    
+    # Función de actualización
     def _step(self):
         r = self.dt / self.dx
     
@@ -51,27 +55,36 @@ class FDTD1D:
             if self.boundaries[1] == 'mur':
                 mur_coeff = (C * self.dt - self.dx) / (C * self.dt + self.dx)
                 self.e[-1] = e_old_right_1 + mur_coeff * (self.e[-2] - e_old_right_0)
+            if self.boundaries[0] == 'PMC':
+                self.e[0] += 2*r*self.h[0] 
+            if self.boundaries[1] == 'PMC':
+                self.e[-1] += -2*r*self.h[-1] 
 
         if self.pert is not None and self.x_o is not None:
             idx = np.argmin(np.abs(self.x - self.x_o))
-            self.e[idx] += self.pert(self.t)
+            self.e[idx] = self.pert(self.t)
 
         self.h += r * (self.e[1:] - self.e[:-1])
-    
-        if self.boundaries is not None:
-            if self.boundaries[0] == 'PMC':
-                self.h[0] = 0.0
-            if self.boundaries[1] == 'PMC':
-                self.h[-1] = 0.0
         
         self.t += self.dt   
 
     def run_until(self, t_final):
         n_steps = round((t_final - self.t) / self.dt)
+        plt.ion()
+        fig, ax = plt.subplots()
         for _ in range(n_steps):
             self._step()
+            ax.clear()  # Limpia el gráfico anterior
+            ax.plot(self.x, self.e, label = 'E')
+            ax.plot(self.xH, self.h, label = 'H')
+            ax.set_ylim(-1, 1)
+            ax.set_title(f"t={self.t}")
+            plt.legend()
+            plt.pause(0.0001)  # Pequeña pausa para animación
+        plt.ioff()
+        plt.show()
         self.t = t_final  
-
+        
     def get_e(self):
         return self.e.copy()
 

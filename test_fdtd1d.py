@@ -110,7 +110,7 @@ def test_fdtd_PMC_boundary_conditions():
     e_expected = np.zeros_like(e_solved)
 
     assert np.corrcoef(h_solved, h_expected)[0,1] > 0.99
-    assert np.max(np.abs(e_solved - e_expected)) < 0.2
+    assert np.max(np.abs(e_solved - e_expected)) < 1e-8
 
 def test_fdtd_total_spread_field():
     xMax = 1
@@ -119,12 +119,12 @@ def test_fdtd_total_spread_field():
 
     x = np.linspace(xMin,xMax,201)
     xH = (x[1:] + x[:-1]) / 2.0
-    boundaries = ('PEC','PEC') 
+    boundaries = ('mur','mur') 
     x_o = 0
     initial_e = np.zeros_like(x)
 
     def my_pert(t):
-        return np.sin(t)
+        return np.sin(t*np.pi)
 
     fdtd = FDTD1D(x,boundaries,x_o,pert = lambda t: my_pert(t))
     fdtd.load_initial_field(initial_e)
@@ -134,8 +134,8 @@ def test_fdtd_total_spread_field():
     e_solved = fdtd.get_e()
     h_solved = fdtd.get_h()
 
-    e_expected = np.sin(x - L)
-    h_expected = np.sin(xH - L)
+    e_expected = my_pert(x - L)
+    h_expected = my_pert(xH - L)
     
     assert np.corrcoef(e_solved, e_expected)[0,1] > -0.6
     assert np.corrcoef(h_solved, h_expected)[0,1] > 0.8
