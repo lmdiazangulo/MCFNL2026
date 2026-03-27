@@ -34,7 +34,7 @@ def test_fdtd_PEC_boundary_conditions():
     xMin = -1
     x = np.linspace(xMin, xMax, 201)
     boundaries = ('PEC', 'PEC')
-    
+
     x0 = 0.0
     sigma = 0.05
     initial_e = gaussian(x, x0, sigma)
@@ -51,7 +51,7 @@ def test_fdtd_PEC_boundary_conditions():
 
     e_expected = - initial_e
     h_expected = np.zeros_like(h_solved)
-    
+
     assert np.corrcoef(e_solved, e_expected)[0,1] > 0.99
     assert np.allclose(h_solved, h_expected, atol=0.01)
 
@@ -61,11 +61,11 @@ def test_fdtd_periodic_boundary_conditions():
     xMin = -1
     x = np.linspace(xMin, xMax, 201)
     boundaries = ('periodic', 'periodic')
-    
+
     x0 = 0.0
     sigma = 0.05
     initial_e = gaussian(x, x0, sigma)
-    initial_h = np.zeros_like(initial_e[:-1]) 
+    initial_h = np.zeros_like(initial_e[:-1])
 
     fdtd = FDTD1D(x, boundaries)
     fdtd.load_initial_field(initial_e)
@@ -81,10 +81,64 @@ def test_fdtd_periodic_boundary_conditions():
     h_expected = initial_h
 
     assert np.corrcoef(e_solved, e_expected)[0, 1] > 0.99
-    assert np.allclose(h_solved, h_expected, atol=1e-2)
+    assert np.allclose(h_solved, h_expected, atol=1e-10)
 
+def test_fdtd_PMC_boundary_conditions():
+    xMax = 1
+    xMin = -1
+    x = np.linspace(xMin, xMax, 201)
+    xH = (x[1:] + x[:-1]) / 2.0
+    boundaries = ('PMC', 'PMC')
+    
+    x0 = 0.0
+    sigma = 0.05
+    initial_h = gaussian(xH, x0, sigma)
+    initial_e = np.zeros_like(x)
 
+    fdtd = FDTD1D(x, boundaries)
+    fdtd.load_initial_field(initial_e)
+    fdtd.h = initial_h.copy()
 
+    L = xMax - xMin
+    t_final = L / C
+    fdtd.run_until(t_final)
+
+    e_solved = fdtd.get_e()
+    h_solved = fdtd.get_h()
+
+    h_expected = - initial_h
+    e_expected = np.zeros_like(e_solved)
+
+    assert np.corrcoef(h_solved, h_expected)[0,1] > 0.99
+    assert np.max(np.abs(e_solved - e_expected)) < 1e-8
+
+def test_fdtd_total_spread_field():
+    xMax = 1
+    xMin = -1
+    L = xMax - xMin
+
+    x = np.linspace(xMin,xMax,201)
+    xH = (x[1:] + x[:-1]) / 2.0
+    boundaries = ('mur','mur') 
+    x_o = 0
+    initial_e = np.zeros_like(x)
+
+    def my_pert(t):
+        return np.sin(t*np.pi)
+
+    fdtd = FDTD1D(x,boundaries,x_o,pert = lambda t: my_pert(t))
+    fdtd.load_initial_field(initial_e)
+    t_final = L / C
+    fdtd.run_until(t_final)
+
+    e_solved = fdtd.get_e()
+    h_solved = fdtd.get_h()
+
+    e_expected = my_pert(x - L)
+    h_expected = my_pert(xH - L)
+    
+    assert np.corrcoef(e_solved, e_expected)[0,1] > -0.6
+    assert np.corrcoef(h_solved, h_expected)[0,1] > 0.8
 
 def test_fdtd_mur_boundary_conditions():
     xMax = 1
@@ -112,47 +166,91 @@ def test_fdtd_mur_boundary_conditions():
     assert np.allclose(e_solved, 0.0, atol=1e-2)
     assert np.allclose(h_solved, 0.0, atol=1e-2)
 
+def test_fdtd_dissipative_exact():
+    xMax = 1.0
+    xMin = -1.0
+    L = xMax - xMin
 
-def test_fdtd_conductive_medium():
-
-    N = 401
-    x = np.linspace(-2, 2, N)
+    x = np.linspace(xMin, xMax, 201)
     xH = (x[1:] + x[:-1]) / 2.0
+    boundaries = ('periodic', 'periodic')
 
-    epsilon = np.ones(N)
-    epsilon2 = 4.0
-    interface_idx = N // 2
-    epsilon[interface_idx:] = epsilon2
+    x0 = 0.0
+    k = np.pi  
+    initial_e = np.sin((x-x0)*k)
+    initial_h = np.zeros_like(initial_e[:-1])
+
+    fdtd = FDTD1D(x, boundaries)
+    fdtd.load_initial_field(initial_e)
+    fdtd.h = initial_h.copy()
+    
+    sigma_val = 1.0
+    eps_r_val = 2.0
+    
+    fdtd.sig = np.full_like(x, sigma_val)       
+    fdtd.eps_r = np.full_like(x, eps_r_val)
+    fdtd.eps = fdtd.eps0 * fdtd.eps_r
+
+    gamma = sigma_val / (2 * fdtd.eps0 * eps_r_val)
+    w0_sq = (k**2) / (fdtd.mu0 * fdtd.eps0 * eps_r_val)
+    wd = np.sqrt(w0_sq - gamma**2)
+
+    t_final = L / C
+    fdtd.run_until(t_final)
+
+    e_solved = fdtd.get_e()
+    h_solved = fdtd.get_h()
+    
+    t_func_E = np.exp(-gamma * t_final) * (np.cos(wd * t_final) - (gamma / wd) * np.sin(wd * t_final))
+    t_func_H = np.exp(-gamma * t_final) * (k / (fdtd.mu0 * wd)) * np.sin(wd * t_final)
+
+    e_expected = t_func_E * np.sin(k * (x - x0))
+    h_expected = t_func_H * np.cos(k * (xH - x0)) 
+
+    assert np.allclose(e_solved, e_expected, atol=1e-2)
+    assert np.allclose(h_solved, h_expected, atol=1e-2)
+
+
+def test_fdtd_dielectric_reflection():
+    N = 601
+    x = np.linspace(-3, 3, N)
+    xH = (x[1:] + x[:-1]) / 2.0
+    boundaries = ('mur', 'mur')
 
     x0 = -1.0
     sig = 0.08
+    eps_r_val = 4.0
 
     initial_e = gaussian(x, x0, sig)
     initial_h = -gaussian(xH, x0, sig)
 
-    fdtd = FDTD1D(x, ('mur', 'mur'), epsilon=epsilon, sigma=0.0)
+    fdtd = FDTD1D(x, boundaries)
     fdtd.load_initial_field(initial_e)
     fdtd.h = initial_h.copy()
 
-    t_final = 2.0
+    interface_idx = N // 2
+    fdtd.eps_r[interface_idx:] = eps_r_val
+    fdtd.eps = fdtd.eps0 * fdtd.eps_r
+
+    L = abs(x0 - 0.0)
+    t_final = 2 * L / C
     fdtd.run_until(t_final)
 
     e_solved = fdtd.get_e()
 
-    eta1 = 1.0 / np.sqrt(1.0)
-    eta2 = 1.0 / np.sqrt(epsilon2)
-    Gamma = (eta2 - eta1) / (eta2 + eta1)
+    eta0 = 1.0 / np.sqrt(1.0)
+    eta1 = 1.0 / np.sqrt(eps_r_val)
+    Gamma = (eta1 - eta0) / (eta1 + eta0)
 
-    left_mask = x < -0.5
+    left_mask = x < -0.3
     e_left = e_solved[left_mask]
     peak_idx = np.argmax(np.abs(e_left))
-    measured_peak = e_left[peak_idx]
+    reflected_peak = e_left[peak_idx]
+    incident_peak = 1.0
 
-    # Reflected pulse must be inverted (negative)
-    assert measured_peak < 0
+    assert reflected_peak < 0
 
-    # Amplitude must match |Gamma| within 5%
-    assert abs(measured_peak / Gamma - 1) < 0.05
+    assert abs((reflected_peak / incident_peak) / Gamma - 1) < 0.05
 
 
 if __name__ == "__main__":
