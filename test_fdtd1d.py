@@ -212,45 +212,56 @@ def test_fdtd_dissipative_exact():
 
 
 def test_fdtd_dielectric_reflection():
-    N = 601
-    x = np.linspace(-3, 3, N)
+    L = 2.0
+    N = 401
+    x = np.linspace(0, L, N)
     xH = (x[1:] + x[:-1]) / 2.0
+    dx = x[1] - x[0]
+    dt = dx / C
+    
     boundaries = ('mur', 'mur')
 
-    x0 = -1.0
-    sig = 0.08
-    eps_r_val = 4.0
+    x0 = 0.4
+    sigma = 0.05
+    initial_e = gaussian(x, x0, sigma)
+    initial_h = -gaussian(xH, x0, sigma)
 
-    initial_e = gaussian(x, x0, sig)
-    initial_h = -gaussian(xH, x0, sig)
+    E_inc_max = np.max(initial_e)
 
     fdtd = FDTD1D(x, boundaries)
     fdtd.load_initial_field(initial_e)
     fdtd.h = initial_h.copy()
 
-    interface_idx = N // 2
-    fdtd.eps_r[interface_idx:] = eps_r_val
-    fdtd.eps = fdtd.eps0 * fdtd.eps_r
+    eps_r_1 = 1.0  
+    eps_r_2 = 4.0   
+    interface_pos = L / 2
+    
+    fdtd.eps_r = np.where(x < interface_pos, eps_r_1, eps_r_2)
+    fdtd.sig = np.zeros_like(x)  # Sin conductividad
 
-    L = abs(x0 - 0.0)
-    t_final = 2 * L / C
-    fdtd.run_until(t_final)
+    eta_0 = 1.0 / np.sqrt(eps_r_1)  # = 1
+    eta_1 = 1.0 / np.sqrt(eps_r_2)  # = 0.5
+    R_theory = (eta_0 - eta_1) / (eta_0 + eta_1)
 
-    e_solved = fdtd.get_e()
+    obs_idx = 30  # x ≈ 0.15
 
-    eta0 = 1.0 / np.sqrt(1.0)
-    eta1 = 1.0 / np.sqrt(eps_r_val)
-    Gamma = (eta1 - eta0) / (eta1 + eta0)
+    t_at_interface = (interface_pos - x0) / C
+    t_ref_at_obs = t_at_interface + (interface_pos - x[obs_idx]) / C
 
-    left_mask = x < -0.3
-    e_left = e_solved[left_mask]
-    peak_idx = np.argmax(np.abs(e_left))
-    reflected_peak = e_left[peak_idx]
-    incident_peak = 1.0
+    t_final = 2.0
+    n_steps = int(t_final / dt)
+    
+    E_ref_max_observed = 0.0
+    
+    for _ in range(n_steps):
+        fdtd._step()
+        if fdtd.t > t_ref_at_obs - 0.1:
+            E_at_obs = np.abs(fdtd.e[obs_idx])
+            E_ref_max_observed = max(E_ref_max_observed, E_at_obs)
 
-    assert reflected_peak < 0
+    R_numerical = E_ref_max_observed / E_inc_max
 
-    assert abs((reflected_peak / incident_peak) / Gamma - 1) < 0.05
+    assert np.abs(R_numerical - np.abs(R_theory)) < 0.02
 
 
 if __name__ == "__main__":
