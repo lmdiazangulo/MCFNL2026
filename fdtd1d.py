@@ -48,7 +48,7 @@ class FDTD1D:
                 e_old_right_0 = self.e[-1]
                 e_old_right_1 = self.e[-2]
 
-        self.e[1:-1] = ca[1:-1] * self.e[1:-1] + cb[1:-1] * (self.h[1:] - self.h[:-1])
+        self.e[1:-1] = ca[1:-1] * self.e[1:-1] - cb[1:-1] * (self.h[1:] - self.h[:-1])
 
         if self.boundaries is not None:
             if self.boundaries[0] == 'PEC':
@@ -56,7 +56,7 @@ class FDTD1D:
             if self.boundaries[1] == 'PEC':
                 self.e[-1] = 0.0
             if self.boundaries[0] == 'periodic':
-                self.e[0] = ca[0] * self.e[0] + cb[0] * (self.h[0] - self.h[-1])
+                self.e[0] = ca[0] * self.e[0] - cb[0] * (self.h[0] - self.h[-1])
                 self.e[-1] = self.e[0]
             if self.boundaries[0] == 'mur':
                 mur_coeff = (C * self.dt - self.dx) / (C * self.dt + self.dx)
@@ -65,15 +65,15 @@ class FDTD1D:
                 mur_coeff = (C * self.dt - self.dx) / (C * self.dt + self.dx)
                 self.e[-1] = e_old_right_1 + mur_coeff * (self.e[-2] - e_old_right_0)
             if self.boundaries[0] == 'PMC':
-                self.e[0] += 2*r*self.h[0] 
+                self.e[0] -= 2*r*self.h[0] 
             if self.boundaries[1] == 'PMC':
-                self.e[-1] += -2*r*self.h[-1] 
+                self.e[-1] += 2*r*self.h[-1] 
 
         if self.pert is not None and self.x_o is not None:
             idx = np.argmin(np.abs(self.x - self.x_o))
             self.e[idx] = self.pert(self.t)
 
-        self.h += r * (self.e[1:] - self.e[:-1])
+        self.h -= r * (self.e[1:] - self.e[:-1])
         
         self.t += self.dt   
 

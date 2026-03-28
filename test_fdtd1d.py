@@ -135,7 +135,7 @@ def test_fdtd_total_spread_field():
     h_solved = fdtd.get_h()
 
     e_expected = my_pert(x - L)
-    h_expected = my_pert(xH - L)
+    h_expected = -my_pert(xH - L)
     
     assert np.corrcoef(e_solved, e_expected)[0,1] > -0.6
     assert np.corrcoef(h_solved, h_expected)[0,1] > 0.8
@@ -205,7 +205,7 @@ def test_fdtd_dissipative_exact():
     t_func_H = np.exp(-gamma * t_final) * (k / (fdtd.mu0 * wd)) * np.sin(wd * t_final)
 
     e_expected = t_func_E * np.sin(k * (x - x0))
-    h_expected = t_func_H * np.cos(k * (xH - x0)) 
+    h_expected = -t_func_H * np.cos(k * (xH - x0)) 
 
     assert np.allclose(e_solved, e_expected, atol=1e-2)
     assert np.allclose(h_solved, h_expected, atol=1e-2)
