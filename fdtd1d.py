@@ -88,3 +88,4 @@ class FDTD1D:
 
     def get_h(self):
         return self.h.copy()
+    # Comprobación hecha
