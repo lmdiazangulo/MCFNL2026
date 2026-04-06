@@ -10,7 +10,7 @@ class FDTD1D:
     mu0 = 1.0
     eps0 = 1.0  
     
-    def __init__(self, x, boundaries=None, x_o=None, pert=None):
+    def __init__(self, x, boundaries=None, x_o=None, pert=None, x_tf_sf=None):
         self.x = x
         self.xH = (self.x[1:] + self.x[:-1]) / 2.0
         self.dx = x[1] - x[0]
@@ -26,6 +26,7 @@ class FDTD1D:
         self.eps = self.eps0 * self.eps_r  
         self.x_o = x_o
         self.pert = pert
+        self.x_tf_sf = x_tf_sf
 
     # Cambia el estado del campo inicial a lo que se le pase
     def load_initial_field(self, e0):
@@ -69,6 +70,13 @@ class FDTD1D:
             if self.boundaries[1] == 'PMC':
                 self.e[-1] += 2*r*self.h[-1] 
 
+        # TF/SF para el campo eléctrico
+        if self.x_tf_sf is not None and self.pert is not None:    
+            # Busco el índice donde se seàra el campo total del dispersado
+            idx = np.argmin(np.abs(self.x - self.x_tf_sf))
+            # Corrijo E (usnado el campo incidente de la fuente)
+            self.e[idx] += (self.dt / (self.eps[idx] * self.dx)) * self.pert(self.t)        
+
         if self.pert is not None and self.x_o is not None:
             idx = np.argmin(np.abs(self.x - self.x_o))
             self.e[idx] = self.pert(self.t)
@@ -76,6 +84,14 @@ class FDTD1D:
         self.h -= r * (self.e[1:] - self.e[:-1])
         
         self.t += self.dt   
+
+        # TF/SF para el campo magnético
+        if self.x_tf_sf is not None and self.pert is not None:
+            idx_h = np.argmin(np.abs(self.xH - self.x_tf_sf))
+            # Corrijo H
+            self.h[idx_h] -= (self.dt / (self.mu0 * self.dx)) * self.pert(self.t)
+
+        
 
     def run_until(self, t_final):
         n_steps = round((t_final - self.t) / self.dt)
