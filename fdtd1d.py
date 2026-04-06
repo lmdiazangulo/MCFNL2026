@@ -65,9 +65,9 @@ class FDTD1D:
                 mur_coeff = (C * self.dt - self.dx) / (C * self.dt + self.dx)
                 self.e[-1] = e_old_right_1 + mur_coeff * (self.e[-2] - e_old_right_0)
             if self.boundaries[0] == 'PMC':
-                self.e[0] -= 2*r*self.h[0] 
+                self.e[0] = 0.0
             if self.boundaries[1] == 'PMC':
-                self.e[-1] += 2*r*self.h[-1] 
+                self.e[-1] = 0.0
 
         if self.pert is not None and self.x_o is not None:
             idx = np.argmin(np.abs(self.x - self.x_o))
@@ -75,13 +75,26 @@ class FDTD1D:
 
         self.h -= r * (self.e[1:] - self.e[:-1])
         
+        if self.boundaries is not None:
+            if self.boundaries[0] == 'PMC':
+                self.h[0] = 0
+            if self.boundaries[1] == 'PMC':
+                self.h[-1] = 0
+
         self.t += self.dt   
 
-    def run_until(self, t_final):
+    def run_until(self, t_final, dt=None):
+        if dt is not None:
+            old_dt = self.dt
+            self.dt = dt
+        else:
+            old_dt = None
         n_steps = round((t_final - self.t) / self.dt)
         for _ in range(n_steps):
             self._step()
-        self.t = t_final  
+        self.t = t_final
+        if old_dt is not None:
+            self.dt = old_dt
         
     def get_e(self):
         return self.e.copy()
