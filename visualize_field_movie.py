@@ -242,3 +242,28 @@ anim_ts = FuncAnimation(fig_ts, update_ts, frames=len(frames_tfsf),
 
 plt.close(fig_ts)
 HTML(anim_ts.to_jshtml())
+# %%
+# %% Verificación de sondas
+x_vals = np.linspace(-1, 1, 400)
+sim = FDTD1D(x_vals, boundaries=('mur', 'mur'))
+
+# Defino una fuente gaussiana para TF/SF
+def source(t):
+    return np.exp(-0.5 * ((t - 0.3) / 0.05)**2)
+
+sim.pert = source
+sim.x_tf_sf = 0.0
+
+# Añado una sonda a la izquierda (Scattered Field) y otra a la derecha (Total Field)
+sim.add_probe(-0.5)
+sim.add_probe(0.5)
+
+# Ejecuto
+sim.run_until(1.5)
+
+# Grafico la sonda de x = 0.5+
+plt.plot(sim.probe_data[1], label="Sonda en x=0.5")
+plt.title("Evolución temporal del campo")
+plt.legend()
+plt.show()
+# %%

@@ -28,6 +28,9 @@ class FDTD1D:
         self.pert = pert
         self.x_tf_sf = x_tf_sf
 
+        self.probe_indices = []  # Índices de la rejilla donde están las sondas
+        self.probe_data = []     # Lista de listas para guardar los valores de E
+
     # Cambia el estado del campo inicial a lo que se le pase
     def load_initial_field(self, e0):
         self.e = e0.copy()
@@ -83,7 +86,6 @@ class FDTD1D:
 
         self.h -= r * (self.e[1:] - self.e[:-1])
         
-        self.t += self.dt   
 
         # TF/SF para el campo magnético
         if self.x_tf_sf is not None and self.pert is not None:
@@ -91,6 +93,11 @@ class FDTD1D:
             # Corrijo H
             self.h[idx_h] -= (self.dt / (self.mu0 * self.dx)) * self.pert(self.t)
 
+        self.t += self.dt
+
+        # Grabo datos en las sondas
+        for i, idx in enumerate(self.probe_indices):
+            self.probe_data[i].append(self.e[idx])
         
 
     def run_until(self, t_final):
@@ -105,3 +112,9 @@ class FDTD1D:
     def get_h(self):
         return self.h.copy()
     # Comprobación comprobada
+
+    def add_probe(self, x_probe):
+        """Añade una sonda en la posición x más cercana."""
+        idx = np.argmin(np.abs(self.x - x_probe))
+        self.probe_indices.append(idx)
+        self.probe_data.append([]) # Creamos una lista vacía para esta sonda
