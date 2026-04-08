@@ -1,19 +1,23 @@
 """
 Analytical reflection and transmission coefficients using the Transfer Matrix Method.
 
+All computations use NORMALIZED units (c=1, eps_0=1, mu_0=1, eta_0=1),
+consistent with the FDTD1D class in the repository.
+
 For a homogeneous panel of thickness d with complex permittivity
-    eps_c = eps_r * eps_0 - j * sigma / omega
+    eps_c = eps_r - j * sigma / omega
 the transfer (ABCD) matrix is (notes eq. 1.19):
     Phi = [[cosh(gamma*d),  eta*sinh(gamma*d)],
            [sinh(gamma*d)/eta,  cosh(gamma*d)]]
 where
-    gamma = j * omega * sqrt(mu * eps_c)   (complex propagation constant)
-    eta   = sqrt(mu / eps_c)               (intrinsic impedance)
+    gamma = j * omega * sqrt(mu_r * eps_c)
+    eta   = sqrt(mu_r / eps_c)
 
 T and R are then obtained from (notes eqs. 1.24, 1.25):
-    T = 2*eta0 / (Phi11*eta0 + Phi12 + Phi21*eta0^2 + Phi22*eta0)
-    R = (Phi11*eta0 + Phi12 - Phi21*eta0^2 - Phi22*eta0) /
-        (Phi11*eta0 + Phi12 + Phi21*eta0^2 + Phi22*eta0)
+    T = 2 / (Phi11 + Phi12 + Phi21 + Phi22)
+    R = (Phi11 + Phi12 - Phi21 - Phi22) / (Phi11 + Phi12 + Phi21 + Phi22)
+
+(with eta_0 = 1 in normalized units, the formulas simplify).
 
 References:
     [1] Class notes, section 1.4.3
@@ -21,12 +25,6 @@ References:
 """
 
 import numpy as np
-
-# Free-space constants
-mu_0 = 4.0 * np.pi * 1e-7        # H/m
-eps_0 = 8.854187817e-12           # F/m
-c_0 = 1.0 / np.sqrt(mu_0 * eps_0)  # m/s
-eta_0 = np.sqrt(mu_0 / eps_0)      # ~377 Ohm
 
 
 def panel_transfer_matrix(freq, d, eps_r=1.0, sigma=0.0, mu_r=1.0):
@@ -36,29 +34,26 @@ def panel_transfer_matrix(freq, d, eps_r=1.0, sigma=0.0, mu_r=1.0):
     Parameters
     ----------
     freq : array_like
-        Frequencies in Hz.
+        Frequencies (normalized units).
     d : float
-        Panel thickness in meters.
+        Panel thickness (normalized units).
     eps_r : float
         Relative permittivity.
     sigma : float
-        Conductivity in S/m.
+        Conductivity (normalized units).
     mu_r : float
         Relative permeability.
 
     Returns
     -------
     Phi : ndarray, shape (len(freq), 2, 2)
-        Transfer matrix at each frequency.
     """
     freq = np.atleast_1d(np.asarray(freq, dtype=complex))
     omega = 2.0 * np.pi * freq
 
-    mu = mu_r * mu_0
-    eps_c = eps_r * eps_0 - 1j * sigma / omega  # complex permittivity
-
-    gamma = 1j * omega * np.sqrt(mu * eps_c)    # propagation constant
-    eta = np.sqrt(mu / eps_c)                    # intrinsic impedance
+    eps_c = eps_r - 1j * sigma / omega
+    gamma = 1j * omega * np.sqrt(mu_r * eps_c)
+    eta = np.sqrt(mu_r / eps_c)
 
     gd = gamma * d
     ch = np.cosh(gd)
@@ -80,7 +75,7 @@ def stack_transfer_matrix(freq, layers):
     Parameters
     ----------
     freq : array_like
-        Frequencies in Hz.
+        Frequencies (normalized units).
     layers : list of dict
         Each dict has keys: 'd', 'eps_r', 'sigma', 'mu_r' (optional).
 
@@ -101,7 +96,6 @@ def stack_transfer_matrix(freq, layers):
             sigma=layer.get('sigma', 0.0),
             mu_r=layer.get('mu_r', 1.0),
         )
-        # Matrix multiply at each frequency
         Phi_new = np.zeros_like(Phi_total)
         Phi_new[:, 0, 0] = Phi_total[:, 0, 0] * Phi_i[:, 0, 0] + Phi_total[:, 0, 1] * Phi_i[:, 1, 0]
         Phi_new[:, 0, 1] = Phi_total[:, 0, 0] * Phi_i[:, 0, 1] + Phi_total[:, 0, 1] * Phi_i[:, 1, 1]
@@ -112,64 +106,40 @@ def stack_transfer_matrix(freq, layers):
     return Phi_total
 
 
-def RT_from_transfer_matrix(Phi, eta0=eta_0):
+def RT_from_transfer_matrix(Phi):
     """
-    Compute reflection (R) and transmission (T) coefficients from the ABCD matrix.
+    Compute reflection (R) and transmission (T) from the ABCD matrix.
 
-    Uses notes eqs. (1.24) and (1.25), assuming free space on both sides.
+    In normalized units eta_0 = 1, so the formulas simplify.
 
     Parameters
     ----------
     Phi : ndarray, shape (N, 2, 2)
-    eta0 : float
-        Impedance of surrounding medium.
 
     Returns
     -------
-    R : ndarray, shape (N,)
-    T : ndarray, shape (N,)
+    R, T : complex ndarrays, shape (N,)
     """
     A = Phi[:, 0, 0]
     B = Phi[:, 0, 1]
     C = Phi[:, 1, 0]
     D = Phi[:, 1, 1]
 
-    denom = A * eta0 + B + C * eta0**2 + D * eta0
+    denom = A + B + C + D
 
-    T = 2.0 * eta0 / denom
-    R = (A * eta0 + B - C * eta0**2 - D * eta0) / denom
+    T = 2.0 / denom
+    R = (A + B - C - D) / denom
 
     return R, T
 
 
 def reflection_transmission(freq, d, eps_r=1.0, sigma=0.0, mu_r=1.0):
-    """
-    Compute R(f) and T(f) for a single homogeneous conductive panel in free space.
-
-    Parameters
-    ----------
-    freq : array_like
-        Frequencies in Hz.
-    d : float
-        Panel thickness (m).
-    eps_r : float
-        Relative permittivity.
-    sigma : float
-        Conductivity (S/m).
-    mu_r : float
-        Relative permeability.
-
-    Returns
-    -------
-    R, T : complex ndarrays
-    """
+    """Compute R(f) and T(f) for a single panel."""
     Phi = panel_transfer_matrix(freq, d, eps_r, sigma, mu_r)
     return RT_from_transfer_matrix(Phi)
 
 
 def reflection_transmission_stack(freq, layers):
-    """
-    Compute R(f) and T(f) for a stack of panels in free space.
-    """
+    """Compute R(f) and T(f) for a stack of panels."""
     Phi = stack_transfer_matrix(freq, layers)
     return RT_from_transfer_matrix(Phi)

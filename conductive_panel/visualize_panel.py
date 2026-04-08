@@ -22,8 +22,7 @@ sys.path.insert(0, os.path.dirname(__file__) if '__file__' in dir() else '.')
 sys.path.insert(0, os.path.join(os.path.dirname(__file__) if '__file__' in dir() else '.', '..'))
 
 from fdtd1d import FDTD1D, gaussian
-from compare import transfer_matrix_normalized, transfer_matrix_stack_normalized
-from transfer_matrix import RT_from_transfer_matrix
+from transfer_matrix import panel_transfer_matrix, stack_transfer_matrix, RT_from_transfer_matrix
 from fdtd_panel import run_fdtd_panel, run_fdtd_reference, compute_RT_fdtd
 
 # %% [markdown]
@@ -141,8 +140,8 @@ freq_fdtd, R_fdtd, T_fdtd = compute_RT_fdtd(panel_res, ref_res)
 
 # Analytical
 f_anal = np.linspace(0.01, freq_fdtd.max(), 2000)
-Phi = transfer_matrix_normalized(f_anal, panel_thickness, eps_r, sigma_val)
-R_anal, T_anal = RT_from_transfer_matrix(Phi, eta0=1.0)
+Phi = panel_transfer_matrix(f_anal, panel_thickness, eps_r, sigma_val)
+R_anal, T_anal = RT_from_transfer_matrix(Phi)
 
 f_bw = 1.0 / (2.0 * np.pi * 0.06)
 f_max = min(3.0 * f_bw, freq_fdtd.max())
@@ -218,8 +217,8 @@ f_sweep = np.linspace(0.01, 8.0, 1000)
 sigma_values = [0.0, 0.1, 0.5, 1.0, 2.0, 5.0]
 
 for sig in sigma_values:
-    Phi = transfer_matrix_normalized(f_sweep, panel_thickness, eps_r, sig)
-    R_s, T_s = RT_from_transfer_matrix(Phi, eta0=1.0)
+    Phi = panel_transfer_matrix(f_sweep, panel_thickness, eps_r, sig)
+    R_s, T_s = RT_from_transfer_matrix(Phi)
     axes[0].plot(f_sweep, np.abs(R_s), label=f'$\\sigma$={sig}')
     axes[1].plot(f_sweep, np.abs(T_s), label=f'$\\sigma$={sig}')
 
