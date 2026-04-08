@@ -39,6 +39,14 @@ dt_per_frame = 0.01
 fdtd = FDTD1D(x)
 fdtd.load_initial_field(e0)
 
+# Define the conductive medium using the set_conducting_slab method
+conductive_start = 0.4  # Start position of the conductive slab
+conductive_end = 0.6     # End position of the conductive slab
+conductivity = 10       # Conductivity of the slab
+relative_permittivity = 1.0  # Relative permittivity of the slab
+fdtd.set_conducting_slab(conductive_start, conductive_end, conductivity, relative_permittivity)
+
+
 frames = []  # E-field snapshots
 times  = []  # corresponding simulation times
 
@@ -66,6 +74,8 @@ ax.set_xlabel("x")
 ax.set_ylabel("E(x, t)")
 ax.set_title("1-D FDTD – Electric field evolution")
 ax.grid(True, alpha=0.3)
+# Add grey shadow for the conductive slab
+ax.axvspan(conductive_start, conductive_end, color='grey', alpha=0.3, label="Conductive Slab")
 
 (line,)  = ax.plot([], [], lw=2, color="royalblue")
 time_txt = ax.text(0.02, 0.93, "", transform=ax.transAxes, fontsize=10)
