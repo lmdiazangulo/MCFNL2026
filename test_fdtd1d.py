@@ -210,5 +210,50 @@ def test_fdtd_dissipative_exact():
     assert np.allclose(e_solved, e_expected, atol=1e-2)
     assert np.allclose(h_solved, h_expected, atol=1e-2)
 
+
+def test_fdtd_conducting_slab_attenuates_pulse():
+    # Spatial grid
+    x = np.linspace(-1.0, 1.0, 401)
+
+    # Pulse parameters
+    x0 = -0.5
+    pulse_width = 0.1
+
+    # Slab parameters
+    slab_start = 0.2
+    slab_end = 0.4
+    conductivity = 10.0
+    eps_r = 2.0
+
+    # Final time (pulse fully passed slab)
+    t_final = 0.8
+
+    # Initialize simulation
+    fdtd = FDTD1D(x, boundaries=('mur', 'mur'))
+    fdtd.load_initial_field(
+        np.exp(-0.5 * ((x - x0) / pulse_width) ** 2)
+    )
+
+    fdtd.set_conducting_slab(
+        slab_start, slab_end,
+        conductivity, eps_r
+    )
+
+    # Run simulation
+    fdtd.run_until(t_final)
+    e = fdtd.get_e()
+
+    # Regions for comparison
+    incident_region = (x < slab_start - 0.1)
+    transmitted_region = (x > slab_end + 0.1)
+
+    incident_amplitude = np.max(np.abs(e[incident_region]))
+    transmitted_amplitude = np.max(np.abs(e[transmitted_region]))
+
+    # The slab MUST attenuate the pulse
+    assert transmitted_amplitude < incident_amplitude, \
+        f"Pulse not sufficiently attenuated: " \
+        f"{transmitted_amplitude} vs {incident_amplitude}"
+
 if __name__ == "__main__":
     pytest.main([__file__])

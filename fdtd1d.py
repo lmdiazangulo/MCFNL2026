@@ -35,12 +35,6 @@ class FDTD1D:
         self.eps_r[mask] = eps_r
         self.eps = self.eps_r
 
-        self.sig = np.zeros(self.N)
-        self.eps_r = np.ones(self.N)      
-        self.eps = self.eps0 * self.eps_r  
-        self.x_o = x_o
-        self.pert = pert
-
     # Cambia el estado del campo inicial a lo que se le pase
     def load_initial_field(self, e0):
         self.e = e0.copy()
@@ -51,11 +45,11 @@ class FDTD1D:
 
         self.eps = self.eps0 * self.eps_r
 
-        denom = 2.0 * self.eps + self.sig * self.dt
-        ca = (2.0 * self.eps - self.sig * self.dt) / denom
+        # Calculate coefficients for the electric field update
+        denom = 2.0 * self.eps[1:-1] + self.sig[1:-1] * self.dt
+        ca = (2.0 * self.eps[1:-1] - self.sig[1:-1] * self.dt) / denom
         cb = (2.0 * self.dt / self.dx) / denom
 
-        # --- Guardar valores de borde para condiciones Mur ---
         if self.boundaries is not None:
             if self.boundaries[0] == 'mur':
                 e_old_left_0 = self.e[0]
@@ -64,7 +58,8 @@ class FDTD1D:
                 e_old_right_0 = self.e[-1]
                 e_old_right_1 = self.e[-2]
 
-        self.e[1:-1] = ca[1:-1] * self.e[1:-1] - cb[1:-1] * (self.h[1:] - self.h[:-1])
+        # --- Update electric field ---
+        self.e[1:-1] = ca * self.e[1:-1] - cb * (self.h[1:] - self.h[:-1])
 
         # --- Condiciones de contorno ---
         if self.boundaries is not None:
@@ -74,7 +69,6 @@ class FDTD1D:
                 self.e[-1] = 0.0
 
             if self.boundaries[0] == 'periodic':
-                self.e[0] = ca[0] * self.e[0] - cb[0] * (self.h[0] - self.h[-1])
                 self.e[0] = ca[0] * self.e[0] - cb[0] * (self.h[0] - self.h[-1])
                 self.e[-1] = self.e[0]
 
@@ -108,3 +102,4 @@ class FDTD1D:
 
     def get_h(self):
         return self.h.copy()
+    
