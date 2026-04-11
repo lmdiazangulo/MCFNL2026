@@ -49,7 +49,7 @@ class FDTD1D:
         
         if self.pert_dir and self.pert is not None and self.x_o is not None and self.t != 0.0:
             idx = np.argmin(np.abs(self.xH - self.x_o))
-            self.h[idx] += self.pert(self.t)
+            self.h[idx] += self.pert(self.t - self.dt/2)
 
         self.e[1:-1] = ca[1:-1] * self.e[1:-1] - cb[1:-1] * (self.h[1:] - self.h[:-1])
 
