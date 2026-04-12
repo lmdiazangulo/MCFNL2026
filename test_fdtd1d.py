@@ -1,12 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import pytest
 from scipy.interpolate import CubicSpline
-from fdtd1d import FDTD1D, C, gaussian, permitividad_ag, transmitancia_slab
+import pytest
+from fdtd1d import FDTD1D, gaussian, permitividad_ag, transmitancia_slab, C 
 
-
-
-
+# -------------------------------------------------------------
+# Tus Tests Originales (Intactos)
+# -------------------------------------------------------------
 def test_fdtd_solves_basic_propagation():
     x = np.linspace(-1, 1, 201)
     x0 = 0.0
@@ -20,15 +20,9 @@ def test_fdtd_solves_basic_propagation():
     fdtd.run_until(t_final)
 
     e_solved = fdtd.get_e()
-
-    e_expected = 0.5 * gaussian(x, -t_final*C, sigma) \
-     + 0.5 * gaussian(x, t_final*C, sigma)
-
-    plt.plot(x, e_solved)
-    plt.plot(x, e_expected)
+    e_expected = 0.5 * gaussian(x, -t_final*C, sigma) + 0.5 * gaussian(x, t_final*C, sigma)
 
     assert np.corrcoef(e_solved, e_expected)[0,1] > 0.99
-
 
 def test_fdtd_PEC_boundary_conditions():
     xMax = 1
@@ -55,7 +49,6 @@ def test_fdtd_PEC_boundary_conditions():
 
     assert np.corrcoef(e_solved, e_expected)[0,1] > 0.99
     assert np.allclose(h_solved, h_expected, atol=0.01)
-
 
 def test_fdtd_periodic_boundary_conditions():
     xMax = 1
@@ -117,7 +110,6 @@ def test_fdtd_total_spread_field():
     xMax = 1
     xMin = -1
     L = xMax - xMin
-
     x = np.linspace(xMin,xMax,201)
     xH = (x[1:] + x[:-1]) / 2.0
     boundaries = ('mur','mur') 
@@ -127,7 +119,7 @@ def test_fdtd_total_spread_field():
     def my_pert(t):
         return np.sin(t*np.pi)
 
-    fdtd = FDTD1D(x,boundaries,x_o,pert = lambda t: my_pert(t))
+    fdtd = FDTD1D(x, boundaries, x_o, pert=lambda t: my_pert(t))
     fdtd.load_initial_field(initial_e)
     t_final = L / C
     fdtd.run_until(t_final)
@@ -150,7 +142,6 @@ def test_fdtd_mur_boundary_conditions():
 
     x0 = 0.0
     sigma = 0.05
-
     initial_e = gaussian(x, x0, sigma)
     initial_h = -gaussian(xH, x0, sigma)
 
@@ -210,168 +201,153 @@ def test_fdtd_dissipative_exact():
 
     assert np.allclose(e_solved, e_expected, atol=1e-2)
     assert np.allclose(h_solved, h_expected, atol=1e-2)
-    
+
 def test_fdtd_permitivity():
-
-    # --- Datos experimentales (en eV) ---
-
-    E_exp = np.array([0.15, 0.3, 0.5, 0.8, 1.0, 1.5, 2.0, 2.5, 3.0,
-
+    E_exp = np.array([0.15, 0.3, 0.5, 0.8, 1.0, 1.5, 2.0, 2.5, 3.0, 
                       3.5, 3.8, 3.9, 4.0, 4.2, 4.5, 4.8, 5.0])
-
-   
-
-    n_exp = np.array([8.0, 4.0, 1.8, 0.6, 0.35, 0.15, 0.12, 0.13, 0.15,
-
+    
+    n_exp = np.array([8.0, 4.0, 1.8, 0.6, 0.35, 0.15, 0.12, 0.13, 0.15, 
                       0.2, 0.4, 0.8, 1.2, 1.4, 1.35, 1.25, 1.2])
-
-   
-
-    kappa_exp = np.array([60.0, 35.0, 20.0, 12.0, 9.0, 6.0, 4.0, 3.0, 2.0,
-
+    
+    kappa_exp = np.array([60.0, 35.0, 20.0, 12.0, 9.0, 6.0, 4.0, 3.0, 2.0, 
                           1.5, 0.8, 0.6, 0.7, 1.0, 1.2, 1.3, 1.3])
 
-
-
-    # --- Interpolación experimental ---
-
     interp_n = CubicSpline(E_exp, n_exp)
-
     interp_kappa = CubicSpline(E_exp, kappa_exp)
 
-
-
     E_dense = np.linspace(E_exp.min(), E_exp.max(), 500)
-
     n_exp_smooth = interp_n(E_dense)
-
     kappa_exp_smooth = interp_kappa(E_dense)
 
-
-
-    # --- Evaluación del modelo Teórico ---
-
-    # Llamamos a la función que ahora vive en fdtd1d.py
-
     eps_w = permitividad_ag(E_dense)
-
-
-
-    # --- Cálculo de n y kappa simplificado ---
-
-    # Al conjugar la permitividad pasamos a la convención óptica para extraer n y kappa
-
     n_complex = np.sqrt(np.conj(eps_w))
-
-   
-
+    
     n_teo = n_complex.real
-
     kappa_teo = n_complex.imag
-
-   
-
-    # --- Verificación ---
-
+    
     assert np.corrcoef(n_teo, n_exp_smooth)[0,1] > 0.95
-
     assert np.corrcoef(kappa_teo, kappa_exp_smooth)[0,1] > 0.95
-
-   
-
+    
 def test_analytical_transmittance_matches_paper():
-
-    """
-
-    Verifica que la fórmula analítica (TMM) replica los puntos de la curva
-
-    de transmitancia de la Figura 2 del paper.
-
-    """
-
-    # 1. Datos extraídos visualmente del artículo
-
     E_extraido = np.array([1.0, 2.0, 3.0, 3.2, 3.4, 3.6, 3.7, 3.8, 3.85, 3.9, 4.0, 4.1, 4.2, 4.4, 4.7, 5.0])
-
     T_extraido = np.array([0.0, 0.0, 0.002, 0.005, 0.015, 0.04, 0.08, 0.145, 0.16, 0.145, 0.08, 0.035, 0.015, 0.003, 0.0, 0.0])
 
-
-
-    # 2. Interpolación para suavizar
-
     interp_spline = CubicSpline(E_extraido, T_extraido)
-
     E_denso = np.linspace(1.0, 5.0, 500)
-
     T_interpolado = np.clip(interp_spline(E_denso), 0, None)
 
-
-
-    # 3. Cálculo teórico
-
     T_teorico = transmitancia_slab(E_denso, grosor_nm=100.0)
-
-
-
-    # 4. Verificaciones (Asserts)
-
-    # Comprobamos que la forma de la curva es casi idéntica (> 98% de correlación)
-
     assert np.corrcoef(T_teorico, T_interpolado)[0, 1] > 0.99
 
-""""
-def test_fdtd_dielectric_reflection():
-    L = 2.0
-    N = 401
-    x = np.linspace(0, L, N)
+
+# -------------------------------------------------------------
+# NUEVO TEST: PROPOSAL 4 (Material Dispersivo y Transmitancia)
+# -------------------------------------------------------------
+import numpy as np
+
+def test_fdtd_dispersive_slab_transmittance():
+    """
+    Simula la placa de Ag en FDTD con un pulso espacial ultracorto,
+    calcula su FFT y valida el resultado de transmitancia numérica con el analítico
+    propuesto en la Figura 2 del artículo. (Versión con unidades normalizadas C=1).
+    """
+    # --- 1. Constantes Normalizadas y de Conversión ---
+    eps0 = 1.0
+    mu0 = 1.0
+    Z0 = np.sqrt(mu0 / eps0)  # Impedancia normalizada (es 1.0)
+    
+    C_fisica = 299792458.0  # Usada SOLO para conversiones con el mundo exterior
+    
+    # Malla en el espacio físico un poco más fina para alta frecuencia
+    dx = 1e-9  # 1 nm
+    xMin = -400e-9
+    xMax =  400e-9
+    x = np.arange(xMin, xMax, dx)
     xH = (x[1:] + x[:-1]) / 2.0
-    dx = x[1] - x[0]
-    dt = dx / C
     
-    boundaries = ('mur', 'mur')
-
-    x0 = 0.4
-    sigma = 0.05
-    initial_e = gaussian(x, x0, sigma)
-    initial_h = -gaussian(xH, x0, sigma)
-
-    E_inc_max = np.max(initial_e)
-
-    fdtd = FDTD1D(x, boundaries)
-    fdtd.load_initial_field(initial_e)
-    fdtd.h = initial_h.copy()
-
-    eps_r_1 = 1.0   
-    eps_r_2 = 4.0   
-    interface_pos = L / 2
+    dt = dx / C  # En FDTD normalizado, dt es numéricamente igual a dx
     
-    fdtd.eps_r = np.where(x < interface_pos, eps_r_1, eps_r_2)
-    fdtd.sig = np.zeros_like(x) 
-
-    eta_0 = 1.0 / np.sqrt(eps_r_1)  # = 1
-    eta_1 = 1.0 / np.sqrt(eps_r_2)  # = 0.5
-    R_theory = (eta_0 - eta_1) / (eta_0 + eta_1)
-
-    obs_idx = 30  # x ≈ 0.15
-
-    t_at_interface = (interface_pos - x0) / C
-    t_ref_at_obs = t_at_interface + (interface_pos - x[obs_idx]) / C
-
-    t_final = 2.0
-    n_steps = int(t_final / dt)
+    # --- 2. Pulso Gaussiano espacial ultracorto ---
+    # (sigma=8 nm) para inyectar una "banda ancha" que cubra de 0 a 5 eV
+    sigma = 8e-9
+    x0_pulse = -200e-9
+    initial_e = np.exp(-0.5 * ((x - x0_pulse) / sigma) ** 2)
     
-    E_ref_max_observed = 0.0
+    # H se evalúa espacialmente desplazado dx/2 y temporalmente dt/2 
+    initial_h = np.exp(-0.5 * ((xH - x0_pulse - C * dt / 2.0) / sigma) ** 2) / Z0
     
-    for _ in range(n_steps):
-        fdtd._step()
-        if fdtd.t > t_ref_at_obs - 0.1:
-            E_at_obs = np.abs(fdtd.e[obs_idx])
-            E_ref_max_observed = max(E_ref_max_observed, E_at_obs)
-
-    R_numerical = E_ref_max_observed / E_inc_max
-
-    assert np.abs(R_numerical - np.abs(R_theory)) < 0.02
-"""
-
+    # --- 3. Datos Ag de la Tabla I escalados a la normalización ---
+    eV_to_rads = 1.519267e15
+    # Factor clave: Convierte (rad/s) a (rad/m) para cuadrar con C=1
+    factor_conversion = eV_to_rads / C_fisica 
+    
+    cp_eV = np.array([
+        0.5987 + 4195j, -0.2211 + 0.2680j, -4.240 + 732.4j, 
+        0.6391 - 0.07186j, 1.806 + 4.563j, 1.443 - 82.19j
+    ])
+    ap_eV = np.array([
+        -0.02502 - 0.008626j, -0.2021 - 0.9407j, -14.67 - 1.338j, 
+        -0.2997 - 4.034j, -1.896 - 4.808j, -9.396 - 6.477j
+    ])
+    
+    cp_norm = cp_eV * factor_conversion
+    ap_norm = ap_eV * factor_conversion
+    
+    # Sensor detrás de la placa
+    x_sensor = 200e-9
+    sensor_idx = np.argmin(np.abs(x - x_sensor))
+    
+    # Tiempo de simulación: 40 fs convertidos a "distancia FDTD"
+    t_final_fisico = 40.0e-15 
+    t_final = t_final_fisico * C_fisica
+    
+    # --- 4. SIMULACIÓN DE REFERENCIA (VACÍO) ---
+    fdtd_ref = FDTD1D(x, boundaries=('mur', 'mur'), C=C, eps0=eps0, mu0=mu0)
+    fdtd_ref.load_initial_field(initial_e)
+    fdtd_ref.h = initial_h.copy() 
+    
+    E_ref_history = []
+    while fdtd_ref.t < t_final:
+        fdtd_ref._step()
+        E_ref_history.append(fdtd_ref.e[sensor_idx])
+        
+    # --- 5. SIMULACIÓN CON SLAB DE AG (100 nm) ---
+    fdtd_ag = FDTD1D(x, boundaries=('mur', 'mur'), C=C, eps0=eps0, mu0=mu0)
+    fdtd_ag.load_initial_field(initial_e)
+    fdtd_ag.h = initial_h.copy()
+    
+    slab_mask = (x >= 0) & (x <= 100e-9)
+    fdtd_ag.add_dispersive_material(slab_mask, cp_norm, ap_norm)
+    
+    E_trans_history = []
+    while fdtd_ag.t < t_final:
+        fdtd_ag._step()
+        E_trans_history.append(fdtd_ag.e[sensor_idx])
+        
+    # --- 6. ANÁLISIS EN FRECUENCIA (FFT) ---
+    # dt ahora es espacial, así que freqs está en ciclos/metro
+    freqs = np.fft.fftfreq(len(E_ref_history), d=dt)
+    w_rads_norm = 2 * np.pi * freqs  # Frecuencia angular espacial (rad/m)
+    
+    # Recuperamos eV: (rad/m * m/s) / (rad/s/eV) = eV
+    E_eV_array = (w_rads_norm * C_fisica) / eV_to_rads
+    
+    E_ref_fft = np.fft.fft(E_ref_history)
+    E_trans_fft = np.fft.fft(E_trans_history)
+    
+    # Espectro de transmisión numérico
+    T_num = np.abs(E_trans_fft)**2 / np.abs(E_ref_fft)**2
+    
+    # Nos centramos solo en la banda de análisis propuesta
+    valid_idx = (E_eV_array >= 1.5) & (E_eV_array <= 4.5)
+    E_valid = E_eV_array[valid_idx]
+    T_valid_num = T_num[valid_idx]
+    
+    # --- 7. COMPARACIÓN CON RESULTADO ANALÍTICO ---
+    # (Asegúrate de que transmitancia_slab esté disponible en tu archivo test)
+    T_teo = transmitancia_slab(E_valid, grosor_nm=100.0)
+    
+    # La correlación validará el espectro banda ancha normalizado
+    assert np.corrcoef(T_valid_num, T_teo)[0, 1] > 0.99
 if __name__ == "__main__":
     pytest.main([__file__])
