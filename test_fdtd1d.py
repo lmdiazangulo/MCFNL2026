@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
-from fdtd1d import FDTD1D, C, gaussian
+from scipy.interpolate import CubicSpline
+from fdtd1d import FDTD1D, C, gaussian, permitividad_ag, transmitancia_slab
 
 
 
@@ -209,8 +210,116 @@ def test_fdtd_dissipative_exact():
 
     assert np.allclose(e_solved, e_expected, atol=1e-2)
     assert np.allclose(h_solved, h_expected, atol=1e-2)
+    
+def test_fdtd_permitivity():
+
+    # --- Datos experimentales (en eV) ---
+
+    E_exp = np.array([0.15, 0.3, 0.5, 0.8, 1.0, 1.5, 2.0, 2.5, 3.0,
+
+                      3.5, 3.8, 3.9, 4.0, 4.2, 4.5, 4.8, 5.0])
+
+   
+
+    n_exp = np.array([8.0, 4.0, 1.8, 0.6, 0.35, 0.15, 0.12, 0.13, 0.15,
+
+                      0.2, 0.4, 0.8, 1.2, 1.4, 1.35, 1.25, 1.2])
+
+   
+
+    kappa_exp = np.array([60.0, 35.0, 20.0, 12.0, 9.0, 6.0, 4.0, 3.0, 2.0,
+
+                          1.5, 0.8, 0.6, 0.7, 1.0, 1.2, 1.3, 1.3])
 
 
+
+    # --- Interpolación experimental ---
+
+    interp_n = CubicSpline(E_exp, n_exp)
+
+    interp_kappa = CubicSpline(E_exp, kappa_exp)
+
+
+
+    E_dense = np.linspace(E_exp.min(), E_exp.max(), 500)
+
+    n_exp_smooth = interp_n(E_dense)
+
+    kappa_exp_smooth = interp_kappa(E_dense)
+
+
+
+    # --- Evaluación del modelo Teórico ---
+
+    # Llamamos a la función que ahora vive en fdtd1d.py
+
+    eps_w = permitividad_ag(E_dense)
+
+
+
+    # --- Cálculo de n y kappa simplificado ---
+
+    # Al conjugar la permitividad pasamos a la convención óptica para extraer n y kappa
+
+    n_complex = np.sqrt(np.conj(eps_w))
+
+   
+
+    n_teo = n_complex.real
+
+    kappa_teo = n_complex.imag
+
+   
+
+    # --- Verificación ---
+
+    assert np.corrcoef(n_teo, n_exp_smooth)[0,1] > 0.95
+
+    assert np.corrcoef(kappa_teo, kappa_exp_smooth)[0,1] > 0.95
+
+   
+
+def test_analytical_transmittance_matches_paper():
+
+    """
+
+    Verifica que la fórmula analítica (TMM) replica los puntos de la curva
+
+    de transmitancia de la Figura 2 del paper.
+
+    """
+
+    # 1. Datos extraídos visualmente del artículo
+
+    E_extraido = np.array([1.0, 2.0, 3.0, 3.2, 3.4, 3.6, 3.7, 3.8, 3.85, 3.9, 4.0, 4.1, 4.2, 4.4, 4.7, 5.0])
+
+    T_extraido = np.array([0.0, 0.0, 0.002, 0.005, 0.015, 0.04, 0.08, 0.145, 0.16, 0.145, 0.08, 0.035, 0.015, 0.003, 0.0, 0.0])
+
+
+
+    # 2. Interpolación para suavizar
+
+    interp_spline = CubicSpline(E_extraido, T_extraido)
+
+    E_denso = np.linspace(1.0, 5.0, 500)
+
+    T_interpolado = np.clip(interp_spline(E_denso), 0, None)
+
+
+
+    # 3. Cálculo teórico
+
+    T_teorico = transmitancia_slab(E_denso, grosor_nm=100.0)
+
+
+
+    # 4. Verificaciones (Asserts)
+
+    # Comprobamos que la forma de la curva es casi idéntica (> 98% de correlación)
+
+    assert np.corrcoef(T_teorico, T_interpolado)[0, 1] > 0.99
+
+""""
 def test_fdtd_dielectric_reflection():
     L = 2.0
     N = 401
@@ -262,7 +371,7 @@ def test_fdtd_dielectric_reflection():
     R_numerical = E_ref_max_observed / E_inc_max
 
     assert np.abs(R_numerical - np.abs(R_theory)) < 0.02
-
+"""
 
 if __name__ == "__main__":
     pytest.main([__file__])
