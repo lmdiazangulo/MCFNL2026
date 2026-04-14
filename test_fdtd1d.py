@@ -282,8 +282,8 @@ def test_fdtd_conductive_panel_reflection():
     Phi = panel_transfer_matrix(freq[band], panel_d, eps_r_panel, sigma_panel)
     R_anal, T_anal = RT_from_transfer_matrix(Phi)
 
-    assert np.corrcoef(np.abs(R_fdtd[band]), np.abs(R_anal))[0, 1] > 0.90
-    assert np.corrcoef(np.abs(T_fdtd[band]), np.abs(T_anal))[0, 1] > 0.90
+    assert np.corrcoef(np.abs(R_fdtd[band]), np.abs(R_anal))[0, 1] > 0.99
+    assert np.corrcoef(np.abs(T_fdtd[band]), np.abs(T_anal))[0, 1] > 0.99
 
 
 def test_fdtd_multilayer_panel_reflection():
