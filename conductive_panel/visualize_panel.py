@@ -17,10 +17,11 @@ _root = os.path.join(_this_dir, '..')
 if not os.path.isfile(os.path.join(_root, 'fdtd1d.py')):
     _root = _this_dir  # already in root
 sys.path.insert(0, os.path.abspath(_root))
-from fdtd1d import FDTD1D, gaussian, run_panel_experiment
+from fdtd1d import FDTD1D, gaussian, C
 from panel_utils import (
-    panel_transfer_matrix, stack_transfer_matrix,
+    stack_transfer_matrix,
     RT_from_transfer_matrix, reflection_transmission,
+    run_panel_experiment
 )
 
 # %% [markdown]
@@ -46,7 +47,7 @@ t0_pulse = 4.0 * pulse_sigma
 pert_fn = lambda t: gaussian(t, t0_pulse, pulse_sigma)
 
 fdtd = FDTD1D(x, boundaries=('mur', 'mur'),
-              x_o=pulse_x0, pert=pert_fn, pert_dir=True)
+              x_o=pulse_x0, pert=pert_fn, pert_dir=+1)
 fdtd.set_panel(panel_center, panel_thickness, eps_r, sigma_val)
 
 n_frames = 250
@@ -145,9 +146,9 @@ plt.tight_layout(); plt.show()
 
 # %% Multi-layer: analytical + FDTD
 layers_ml = [
-    {'d': 0.05, 'eps_r': 2.0, 'sigma': 0.2},
-    {'d': 0.08, 'eps_r': 6.0, 'sigma': 1.0},
-    {'d': 0.05, 'eps_r': 2.0, 'sigma': 0.2},
+    {'d': 0.10, 'eps_r': 10.0, 'sigma': 0.0},
+    {'d': 0.08, 'eps_r': 1.0, 'sigma': 10.0},
+    {'d': 0.15, 'eps_r': 2.0, 'sigma': 0.2},
 ]
 
 f_ml = np.linspace(0.01, 10.0, 1000)
@@ -166,7 +167,7 @@ plt.tight_layout(); plt.show()
 # ## 3b. Multi-layer Panel Animation
 
 # %% Multi-layer animation
-fdtd_ml = FDTD1D(x, boundaries=('mur', 'mur'), x_o=pulse_x0, pert=pert_fn, pert_dir=True)
+fdtd_ml = FDTD1D(x, boundaries=('mur', 'mur'), x_o=pulse_x0, pert=pert_fn, pert_dir=+1)
 fdtd_ml.set_multilayer(panel_center, layers_ml)
 fdtd_ml.load_initial_field(np.zeros_like(x))
 fdtd_ml.h = np.zeros_like(xH)

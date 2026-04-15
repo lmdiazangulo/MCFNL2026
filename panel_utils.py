@@ -118,7 +118,7 @@ def run_panel_experiment(
 
     # ── Simulation WITH panel ──
     fdtd = FDTD1D(x, boundaries=('mur', 'mur'),
-                  x_o=pulse_x0, pert=pert_fn, pert_dir=True)
+                  x_o=pulse_x0, pert=pert_fn, pert_dir=+1)
     if layers is not None:
         fdtd.set_multilayer(panel_center, layers)
     else:
@@ -134,7 +134,7 @@ def run_panel_experiment(
 
     # ── Reference simulation WITHOUT panel ──
     fdtd_ref = FDTD1D(x, boundaries=('mur', 'mur'),
-                      x_o=pulse_x0, pert=pert_fn, pert_dir=True)
+                      x_o=pulse_x0, pert=pert_fn, pert_dir=+1)
 
     E_left_ref = np.zeros(n_steps)
     E_right_ref = np.zeros(n_steps)
