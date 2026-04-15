@@ -7,17 +7,16 @@ Integration tests: FDTD R/T vs analytical transfer matrix.
 import numpy as np
 import pytest
 
-from fdtd1d import FDTD1D, gaussian, run_panel_experiment
-from panel_transfer_matrix import (
+from fdtd1d import FDTD1D, gaussian
+from panel_utils import (
     panel_transfer_matrix,
     stack_transfer_matrix,
     RT_from_transfer_matrix,
     reflection_transmission,
     reflection_transmission_stack,
+    run_panel_experiment
 )
 
-
-# ── Unit tests ──
 
 
 def test_set_panel_assigns_eps_r():

@@ -9,7 +9,7 @@ import sys, os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from fdtd1d import run_panel_experiment
-from panel_transfer_matrix import (
+from panel_utils import (
     reflection_transmission,
     reflection_transmission_stack,
 )
