@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import CubicSpline
 from scipy.interpolate import interp1d
 import pytest
-from fdtd1d import (FDTD1D, gaussian, permitividad_ag, transmitancia_slab, C, 
+from fdtd1d_trabajo4 import (FDTD1D, gaussian, permitividad_ag, transmitancia_slab, C, 
                     get_ag_poles_norm, reflectancia_slab, absorbancia_slab, extract_spectrum)
 
 def test_fdtd_solves_basic_propagation():
