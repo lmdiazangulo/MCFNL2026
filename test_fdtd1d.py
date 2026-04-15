@@ -1,9 +1,185 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
-from fdtd1d import FDTD1D, C, gaussian, panel_transfer_matrix, RT_from_transfer_matrix, stack_transfer_matrix
+from fdtd1d import FDTD1D, FDTD1DNonUniform, C, gaussian, panel_transfer_matrix, RT_from_transfer_matrix, stack_transfer_matrix
+from mesh_utils import (
+    uniform_mesh, cosine_mesh, geometric_mesh, step_mesh, custom_mesh,
+    mesh_stats,
+)
+
+def _run_probe(solver, t_final: float, x_probe: float):
+
+    idx = int(np.argmin(np.abs(solver.x - x_probe)))
+    times, e_probe = [], []
+    while solver.t < t_final - 1e-15:
+        solver._step()
+        times.append(solver.t)
+        e_probe.append(float(solver.e[idx]))
+    return np.array(times), np.array(e_probe), solver.dt
 
 
+def _spectrum(times: np.ndarray, signal: np.ndarray):
+    N  = len(signal)
+    dt = float(times[1] - times[0])
+    freqs = np.fft.rfftfreq(N, d=dt)
+    amp   = np.abs(np.fft.rfft(signal)) / N
+    return freqs, amp
+
+
+def _spectral_correlation(f1, a1, f2, a2,
+                           f_max: float = None) -> float:
+    f_common = np.union1d(f1, f2)
+    if f_max is not None:
+        f_common = f_common[f_common <= f_max]
+    s1 = np.interp(f_common, f1, a1)
+    s2 = np.interp(f_common, f2, a2)
+    norm = np.linalg.norm(s1) * np.linalg.norm(s2)
+    if norm < 1e-30:
+        return 0.0
+    return float(np.dot(s1, s2) / norm)
+
+
+def _make_solver(x, sigma_pulse=0.3, x0_pulse=None, boundaries=('mur', 'mur')):
+    if x0_pulse is None:
+        x0_pulse = x[len(x) // 4]
+    solver = FDTD1DNonUniform(x, boundaries=boundaries)
+    e0 = gaussian(x, x0_pulse, sigma_pulse)
+    solver.load_initial_field(e0)
+    return solver
+
+
+
+
+class TestWaveSpeed:
+    @pytest.mark.parametrize("mesh_fn, label", [
+        (lambda: cosine_mesh(0, 20, 400, 'both'),   'cosine-both'),
+        (lambda: geometric_mesh(0, 20, 400, 1.02),  'geometric-1.02'),  
+        (lambda: step_mesh(0, 20, 400, 0.5, 2.0),   'step-ratio2'),
+    ])
+    def test_pulse_travel_time(self, mesh_fn, label):
+        x  = mesh_fn()
+        x0 = x[len(x) // 4]
+        x1 = x[3 * len(x) // 4]
+        d  = x1 - x0
+
+        solver = _make_solver(x, sigma_pulse=0.3, x0_pulse=x0)
+
+        idx_probe = int(np.argmin(np.abs(x - x1)))
+        t_travel  = d / C
+        t_margin  = 1.5 * t_travel
+        e_probe   = []
+        times     = []
+        while solver.t < t_margin:
+            solver._step()
+            e_probe.append(float(solver.e[idx_probe]))
+            times.append(solver.t)
+
+        t_peak = times[int(np.argmax(np.abs(e_probe)))]
+        rel_err = abs(t_peak - t_travel) / t_travel
+
+        assert rel_err < 0.05, (
+            f"[{label}] Peak arrived at t={t_peak:.4f}, expected {t_travel:.4f} "
+            f"(rel error {rel_err:.3%} > 5%)"
+        )
+
+
+class TestEnergyConservation:
+    @pytest.mark.parametrize("mesh_fn, label, tol", [
+        (lambda: uniform_mesh(0, 20, 400),          'uniform',      0.01),
+        (lambda: cosine_mesh(0, 20, 400, 'both'),   'cosine',       0.05),
+        (lambda: step_mesh(0, 20, 400, 0.5, 2.0),   'step-ratio2',  0.10),
+    ])
+    def test_energy_non_increasing(self, mesh_fn, label, tol):
+
+        x      = mesh_fn()
+        solver = _make_solver(x, sigma_pulse=0.4, boundaries=('mur', 'mur'))
+
+        def total_energy(s):
+            dx_h = np.diff(s.x)
+            dx_e = np.diff(s.xH)
+            e_energy = 0.5 * s.eps0 * np.dot(s.e[1:-1] ** 2, dx_e)
+            h_energy = 0.5 * s.mu0  * np.dot(s.h         ** 2, dx_h)
+            return e_energy + h_energy
+
+        e0 = total_energy(solver)
+        solver.run_until(15.0)
+        e1 = total_energy(solver)
+
+        assert e1 <= e0 * (1.0 + tol), (
+            f"[{label}] Energy increased from {e0:.4e} to {e1:.4e} "
+            f"(ratio {e1/e0:.4f} > {1+tol:.4f})"
+        )
+
+
+class TestBoundaryConditions:
+    def test_pec_field_zero_at_boundary(self):
+        x      = cosine_mesh(0, 10, 201, 'both')
+        solver = _make_solver(x, sigma_pulse=0.3,
+                              boundaries=('PEC', 'PEC'))
+        solver.run_until(2.0)
+        assert solver.e[0] == pytest.approx(0.0, abs=1e-12)
+        assert solver.e[-1] == pytest.approx(0.0, abs=1e-12)
+
+    def test_mur_reduces_boundary_reflection(self):
+
+        x_pec = cosine_mesh(0, 10, 201, 'both')
+        x_mur = cosine_mesh(0, 10, 201, 'both')
+
+        s_pec = _make_solver(x_pec, sigma_pulse=0.3, boundaries=('PEC', 'PEC'))
+        s_mur = _make_solver(x_mur, sigma_pulse=0.3, boundaries=('mur', 'mur'))
+
+        t_exit = 10.0 / C + 1.0
+
+        def rms_e(s):
+            return float(np.sqrt(np.mean(s.e ** 2)))
+
+        s_pec.run_until(t_exit)
+        s_mur.run_until(t_exit)
+
+        assert rms_e(s_mur) < 0.2 * rms_e(s_pec), (
+            f"rms_e PEC={rms_e(s_pec):.4e}, Mur={rms_e(s_mur):.4e}"
+        )
+
+
+class TestFrequencyCorrelation:
+
+    @pytest.mark.parametrize("mesh_fn, rho_min, label", [
+        (lambda: cosine_mesh(0, 20, 300, 'both'),   0.97, 'cosine-both'),
+        (lambda: cosine_mesh(0, 20, 300, 'left'),   0.97, 'cosine-left'),
+        (lambda: geometric_mesh(0, 20, 300, 1.02),  0.97, 'geometric-1.02'),
+        (lambda: step_mesh(0, 20, 300, 0.5, 2.0),   0.85, 'step-ratio2'),
+    ])
+    def test_spectral_correlation(self, mesh_fn, rho_min, label):
+
+        L      = 20.0
+        N_ref  = 300
+        sigma  = 0.5
+        x_src  = 3.0
+        x_prb  = 12.0
+        t_final = 15.0
+
+        # ---- Reference (uniform) ----------------------------------------
+        x_ref   = uniform_mesh(0, L, N_ref)
+        s_ref   = FDTD1DNonUniform(x_ref, boundaries=('mur', 'mur'))
+        e0_ref  = gaussian(x_ref, x_src, sigma)
+        s_ref.load_initial_field(e0_ref)
+        t_ref, ep_ref, _ = _run_probe(s_ref, t_final, x_prb)
+        f_ref, a_ref     = _spectrum(t_ref, ep_ref)
+
+        # ---- Non-uniform ------------------------------------------------
+        x_nu   = mesh_fn()
+        s_nu   = FDTD1DNonUniform(x_nu, boundaries=('mur', 'mur'))
+        e0_nu  = gaussian(x_nu, x_src, sigma)
+        s_nu.load_initial_field(e0_nu)
+        t_nu, ep_nu, _ = _run_probe(s_nu, t_final, x_prb)
+        f_nu, a_nu     = _spectrum(t_nu, ep_nu)
+
+        f_max = 2.0 / sigma
+        rho   = _spectral_correlation(f_ref, a_ref, f_nu, a_nu, f_max=f_max)
+
+        assert rho >= rho_min, (
+            f"[{label}] Spectral correlation {rho:.4f} < {rho_min} (threshold)"
+        )
 
 
 def test_fdtd_solves_basic_propagation():
