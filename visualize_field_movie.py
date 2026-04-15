@@ -212,7 +212,7 @@ fdtd_mur = FDTD1D(
     boundaries=('mur', 'mur'),
     x_o=x0_mur,
     pert=my_pert,
-    pert_dir=+1,
+    pert_dir=-1,
 )
 fdtd_mur.load_initial_field(np.zeros_like(x_mur))
 fdtd_mur.h = np.zeros_like(xH_mur)

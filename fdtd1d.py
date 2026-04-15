@@ -73,12 +73,17 @@ class FDTD1D:
         # 2. Actualizar E
         self.e[1:-1] = ca[1:-1] * self.e[1:-1] - cb[1:-1] * (self.h[1:] - self.h[:-1])
 
-        # --- TF/SF: CORRECCIÓN PARA E ---
-        # Se aplica al nodo E en la frontera (inicio de la región Total Field)
+        # --- CORRECCIÓN PARA E ---
+
         if self.pert is not None and self.x_o is not None:
             idx_e = np.argmin(np.abs(self.x - self.x_o))
-            # Al actualizar E_TF, lee un H_SF. Debemos sumar el H incidente que le falta.
-            self.e[idx_e] += cb[idx_e] * self.pert(self.t + self.dt)
+            val_pert = self.pert(self.t + self.dt)
+            
+            if self.pert_dir: 
+                self.e[idx_e] += cb[idx_e] * val_pert
+            else: 
+                self.e[idx_e] += val_pert
+
 
         # 3. Aplicar condiciones de contorno
         if self.boundaries is not None:
@@ -99,13 +104,17 @@ class FDTD1D:
         # 4. Actualizar H
         self.h -= r * (self.e[1:] - self.e[:-1])
 
-        # --- TF/SF: CORRECCIÓN PARA H ---
-        # Se aplica al nodo H justo antes de la frontera (fin de la región Scattered Field)
-        if self.pert is not None and self.x_o is not None:
+        # --- CORRECCIÓN PARA H ---
+        if self.pert is not None and self.x_o is not None and self.pert_dir:
             idx_e = np.argmin(np.abs(self.x - self.x_o))
-            # Al actualizar H_SF, lee un E_TF. Debemos restar (sumar, por el signo de FDTD) 
-            # el E incidente que "contamina" el cálculo.
-            self.h[idx_e - 1] += r * self.pert(self.t + self.dt)
+            val_pert = self.pert(self.t + self.dt)
+            
+            if self.pert_dir == +1:
+                self.h[idx_e - 1] += r * val_pert
+            elif self.pert_dir == -1:
+                self.h[idx_e] -= r * val_pert
+                
+
 
         self.t += self.dt
 
