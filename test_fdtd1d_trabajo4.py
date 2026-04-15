@@ -319,18 +319,6 @@ def test_fdtd_dispersive_slab_absorcion():
     A_teo = absorbancia_slab(E_eV, grosor_nm=100.0)
 
     valid = (E_eV >= 1.0) & (E_eV <= 5.0)
-    plt.figure(figsize=(8, 5))
-    plt.plot(E_eV[valid], A[valid],color='lightblue', label='Absorción')
-    plt.plot(E_eV[valid], T[valid], 'g--', label='Transmitancia', alpha=0.5)
-    plt.plot(E_eV[valid], R[valid], 'r--', label='Reflectancia', alpha=0.5)
-    plt.plot(E_eV[valid], A_teo[valid], color='black', linestyle='--', label='Absorción Teórica', alpha=0.5)
-    
-    plt.title('Espectro de Absorción FDTD')
-    plt.xlabel('Energía (eV)')
-    plt.ylabel('Magnitud')
-    plt.legend()
-    plt.grid(True, alpha=0.3)
-    plt.show()
     
     assert np.corrcoef(A[valid], A_teo[valid])[0, 1] > 0.99
 
