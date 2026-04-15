@@ -18,7 +18,7 @@ if not os.path.isfile(os.path.join(_root, 'fdtd1d.py')):
     _root = _this_dir  # already in root
 sys.path.insert(0, os.path.abspath(_root))
 from fdtd1d import FDTD1D, gaussian, run_panel_experiment
-from panel_transfer_matrix import (
+from panel_utils import (
     panel_transfer_matrix, stack_transfer_matrix,
     RT_from_transfer_matrix, reflection_transmission,
 )

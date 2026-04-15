@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from IPython.display import HTML
 
-from fdtd1d import FDTD1D
+from fdtd1d import FDTD1D, C
 
 # %% [markdown]
 # ## Simulation parameters
@@ -109,17 +109,113 @@ xH_mur = (x_mur[1:] + x_mur[:-1]) / 2.0
 x0_mur    = 0.0
 sigma_mur = 0.08
 
-# Left-traveling wave: E = gaussian, H = -gaussian
-e0_mur = np.exp(-0.5 * ((x_mur  - x0_mur) / sigma_mur) ** 2)
-h0_mur = -np.exp(-0.5 * ((xH_mur - x0_mur) / sigma_mur) ** 2)
+# Right-going temporal Gaussian source injected at x_o
+def my_pert(t):
+    return np.exp(-0.5 * ((t - 0.3) / sigma_mur) ** 2)
 
 n_frames_mur     = 160
 dt_per_frame_mur = 0.01
 
 # %% Run simulation (Mur)
-fdtd_mur = FDTD1D(x_mur, boundaries=('mur', 'mur'))
-fdtd_mur.load_initial_field(e0_mur)
-fdtd_mur.h = h0_mur.copy()
+fdtd_mur = FDTD1D(
+    x_mur,
+    boundaries=('mur', 'mur'),
+    x_o=x0_mur,
+    pert=my_pert,
+    pert_dir=+1,
+)
+fdtd_mur.load_initial_field(np.zeros_like(x_mur))
+fdtd_mur.h = np.zeros_like(xH_mur)
+
+frames_e_mur = []
+frames_h_mur = []
+times_mur    = []
+
+frames_e_mur.append(fdtd_mur.get_e())
+frames_h_mur.append(fdtd_mur.get_h())
+times_mur.append(fdtd_mur.t)
+
+for _ in range(n_frames_mur - 1):
+    fdtd_mur.run_until(fdtd_mur.t + dt_per_frame_mur)
+    frames_e_mur.append(fdtd_mur.get_e())
+    frames_h_mur.append(fdtd_mur.get_h())
+    times_mur.append(fdtd_mur.t)
+
+print(f"Mur ABC – Captured {len(frames_e_mur)} frames  "
+      f"(t = {times_mur[0]:.3f} … {times_mur[-1]:.3f})")
+
+# %% Animate (Mur)
+fig_mur, ax_mur = plt.subplots(figsize=(8, 4))
+
+ax_mur.set_xlim(x_mur[0], x_mur[-1])
+ax_mur.set_ylim(-1.1, 1.1)
+ax_mur.set_xlim(-1.1, 1.1)
+ax_mur.set_xlabel("x")
+ax_mur.set_ylabel("Field amplitude")
+ax_mur.set_title("1-D FDTD – Mur ABC – Left-traveling wave absorption")
+ax_mur.grid(True, alpha=0.3)
+
+ax_mur.axvline(x_mur[0],  color="red", ls="--", lw=1.5, label="Mur boundary")
+ax_mur.axvline(x_mur[-1], color="red", ls="--", lw=1.5)
+
+(line_e_mur,) = ax_mur.plot([], [], lw=2, color="royalblue", label="E(x, t)")
+(line_h_mur,) = ax_mur.plot([], [], lw=1.5, color="darkorange", label="H(x, t)")
+ax_mur.legend(loc="upper right", fontsize=9)
+
+time_txt_mur = ax_mur.text(0.02, 0.93, "", transform=ax_mur.transAxes, fontsize=10)
+
+
+def init_mur():
+    line_e_mur.set_data([], [])
+    line_h_mur.set_data([], [])
+    time_txt_mur.set_text("")
+    return line_e_mur, line_h_mur, time_txt_mur
+
+
+def update_mur(frame_idx):
+    line_e_mur.set_data(x_mur, frames_e_mur[frame_idx])
+    line_h_mur.set_data(xH_mur, frames_h_mur[frame_idx])
+    time_txt_mur.set_text(f"t = {times_mur[frame_idx]:.3f}")
+    return line_e_mur, line_h_mur, time_txt_mur
+
+
+anim_mur = FuncAnimation(
+    fig_mur,
+    update_mur,
+    frames=len(frames_e_mur),
+    init_func=init_mur,
+    interval=40,
+    blit=True,
+)
+
+plt.close(fig_mur)
+HTML(anim_mur.to_jshtml())
+
+# %% [markdown]
+# Cambiamos la perturbación inicial por una sinusoidal
+# %% Parameters (Mur)
+x_mur  = np.linspace(-1.0, 1.0, 401)
+xH_mur = (x_mur[1:] + x_mur[:-1]) / 2.0
+L = x_mur[-1]-x_mur[0]
+
+x0_mur    = 0.0
+
+def my_pert(t):
+    return np.sin(2*np.pi*2*C/L*t)
+
+n_frames_mur     = 160
+dt_per_frame_mur = 0.01
+
+# %% Run simulation (Mur)
+fdtd_mur = FDTD1D(
+    x_mur,
+    boundaries=('mur', 'mur'),
+    x_o=x0_mur,
+    pert=my_pert,
+    pert_dir=-1,
+)
+fdtd_mur.load_initial_field(np.zeros_like(x_mur))
+fdtd_mur.h = np.zeros_like(xH_mur)
 
 frames_e_mur = []
 frames_h_mur = []
@@ -185,3 +281,4 @@ anim_mur = FuncAnimation(
 plt.close(fig_mur)
 HTML(anim_mur.to_jshtml())
 # %%
+
