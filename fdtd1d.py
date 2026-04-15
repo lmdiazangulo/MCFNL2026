@@ -151,3 +151,74 @@ class FDTD1D:
 
     def get_h(self):
         return self.h.copy()
+
+
+class FDTD1DNonUniform(FDTD1D):
+
+    def __init__(self, x, boundaries=None, x_o=None, pert=None):
+
+        super().__init__(x, boundaries=boundaries, x_o=x_o, pert=pert)
+
+        self.dx_h = np.diff(x)          
+        self.dx_e = np.diff(self.xH)     
+        self.dt = float(np.min(self.dx_h)) / C
+
+    def _step(self):
+
+        eps = self.eps0 * self.eps_r 
+
+        e_old_left_0 = e_old_left_1 = None
+        e_old_right_0 = e_old_right_1 = None
+        if self.boundaries is not None:
+            if self.boundaries[0] == 'mur':
+                e_old_left_0 = self.e[0]
+                e_old_left_1 = self.e[1]
+            if self.boundaries[1] == 'mur':
+                e_old_right_0 = self.e[-1]
+                e_old_right_1 = self.e[-2]
+
+
+        denom_int = 2.0 * eps[1:-1] + self.sig[1:-1] * self.dt
+        ca_int    = (2.0 * eps[1:-1] - self.sig[1:-1] * self.dt) / denom_int
+        cb_int    = (2.0 * self.dt / self.dx_e) / denom_int 
+
+        self.e[1:-1] = (ca_int * self.e[1:-1]
+                        - cb_int * (self.h[1:] - self.h[:-1]))
+
+        if self.boundaries is not None:
+            bc_l, bc_r = self.boundaries
+
+            if bc_l == 'PEC':
+                self.e[0] = 0.0
+            if bc_r == 'PEC':
+                self.e[-1] = 0.0
+
+            if bc_l == 'periodic':
+
+                dx_periodic = 0.5 * (self.dx_h[0] + self.dx_h[-1])
+                denom0 = 2.0 * eps[0] + self.sig[0] * self.dt
+                ca0    = (2.0 * eps[0] - self.sig[0] * self.dt) / denom0
+                cb0    = (2.0 * self.dt / dx_periodic) / denom0
+                self.e[0]  = ca0 * self.e[0] - cb0 * (self.h[0] - self.h[-1])
+                self.e[-1] = self.e[0]
+
+            if bc_l == 'mur':
+                mc = (C * self.dt - self.dx_h[0]) / (C * self.dt + self.dx_h[0])
+                self.e[0] = e_old_left_1 + mc * (self.e[1] - e_old_left_0)
+            if bc_r == 'mur':
+                mc = (C * self.dt - self.dx_h[-1]) / (C * self.dt + self.dx_h[-1])
+                self.e[-1] = e_old_right_1 + mc * (self.e[-2] - e_old_right_0)
+
+            if bc_l == 'PMC':
+                self.e[0]  -= 2.0 * (self.dt / self.dx_h[0])  * self.h[0]
+            if bc_r == 'PMC':
+                self.e[-1] += 2.0 * (self.dt / self.dx_h[-1]) * self.h[-1]
+
+        if self.pert is not None and self.x_o is not None:
+            idx = int(np.argmin(np.abs(self.x - self.x_o)))
+            self.e[idx] = self.pert(self.t)
+
+
+        self.h -= (self.dt / self.dx_h) * (self.e[1:] - self.e[:-1])
+
+        self.t += self.dt
