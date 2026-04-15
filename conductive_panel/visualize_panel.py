@@ -17,10 +17,11 @@ _root = os.path.join(_this_dir, '..')
 if not os.path.isfile(os.path.join(_root, 'fdtd1d.py')):
     _root = _this_dir  # already in root
 sys.path.insert(0, os.path.abspath(_root))
-from fdtd1d import FDTD1D, gaussian, run_panel_experiment
+from fdtd1d import FDTD1D, gaussian, C
 from panel_utils import (
-    panel_transfer_matrix, stack_transfer_matrix,
+    stack_transfer_matrix,
     RT_from_transfer_matrix, reflection_transmission,
+    run_panel_experiment
 )
 
 # %% [markdown]
@@ -46,7 +47,7 @@ t0_pulse = 4.0 * pulse_sigma
 pert_fn = lambda t: gaussian(t, t0_pulse, pulse_sigma)
 
 fdtd = FDTD1D(x, boundaries=('mur', 'mur'),
-              x_o=pulse_x0, pert=pert_fn, pert_dir=True)
+              x_o=pulse_x0, pert=pert_fn, pert_dir=+1)
 fdtd.set_panel(panel_center, panel_thickness, eps_r, sigma_val)
 
 n_frames = 250
@@ -145,9 +146,9 @@ plt.tight_layout(); plt.show()
 
 # %% Multi-layer: analytical + FDTD
 layers_ml = [
-    {'d': 0.05, 'eps_r': 2.0, 'sigma': 0.2},
-    {'d': 0.08, 'eps_r': 6.0, 'sigma': 1.0},
-    {'d': 0.05, 'eps_r': 2.0, 'sigma': 0.2},
+    {'d': 0.10, 'eps_r': 10.0, 'sigma': 0.0},
+    {'d': 0.08, 'eps_r': 1.0, 'sigma': 10.0},
+    {'d': 0.15, 'eps_r': 2.0, 'sigma': 0.2},
 ]
 
 f_ml = np.linspace(0.01, 10.0, 1000)
@@ -161,6 +162,72 @@ axes[0].set_xlabel('Frequency'); axes[0].set_title('|R(f)|'); axes[0].grid(True,
 axes[1].plot(f_ml, np.abs(T_ml), 'r-', lw=1.5); axes[1].set_ylabel('|T|')
 axes[1].set_xlabel('Frequency'); axes[1].set_title('|T(f)|'); axes[1].grid(True, alpha=0.3)
 plt.tight_layout(); plt.show()
+
+# %% [markdown]
+# ## 3b. Multi-layer Panel Animation
+
+# %% Multi-layer animation
+fdtd_ml = FDTD1D(x, boundaries=('mur', 'mur'), x_o=pulse_x0, pert=pert_fn, pert_dir=+1)
+fdtd_ml.set_multilayer(panel_center, layers_ml)
+fdtd_ml.load_initial_field(np.zeros_like(x))
+fdtd_ml.h = np.zeros_like(xH)
+
+n_frames_ml = 220
+
+dt_per_frame_ml = 0.015
+frames_e_ml = [fdtd_ml.get_e()]
+frames_h_ml = [fdtd_ml.get_h()]
+times_ml = [fdtd_ml.t]
+for _ in range(n_frames_ml - 1):
+    fdtd_ml.run_until(fdtd_ml.t + dt_per_frame_ml)
+    frames_e_ml.append(fdtd_ml.get_e())
+    frames_h_ml.append(fdtd_ml.get_h())
+    times_ml.append(fdtd_ml.t)
+
+print(f"Multilayer animation captured {len(frames_e_ml)} frames "
+      f"(t = {times_ml[0]:.3f} ... {times_ml[-1]:.3f})")
+
+fig_ml, ax_ml = plt.subplots(figsize=(10, 5))
+ax_ml.set_xlim(0, L)
+ax_ml.set_ylim(-1.1, 1.1)
+ax_ml.set_xlabel("x")
+ax_ml.set_ylabel("Field amplitude")
+ax_ml.set_title("FDTD -- Pulse through multilayer panel")
+ax_ml.grid(True, alpha=0.3)
+
+panel_width = sum(layer['d'] for layer in layers_ml)
+panel_left_ml = panel_center - panel_width / 2
+edge = panel_left_ml
+for layer in layers_ml:
+    ax_ml.add_patch(Rectangle((edge, -1.1), layer['d'], 2.2,
+                              color='orange', alpha=0.25))
+    edge += layer['d']
+ax_ml.axvline(panel_left_ml, color='orange', ls='--', lw=1)
+ax_ml.axvline(panel_left_ml + panel_width, color='orange', ls='--', lw=1)
+
+(line_e_ml,) = ax_ml.plot([], [], lw=2, color='royalblue', label='E(x,t)')
+(line_h_ml,) = ax_ml.plot([], [], lw=1.5, color='darkorange', alpha=0.7, label='H(x,t)')
+ax_ml.legend(loc='upper right')
+
+time_txt_ml = ax_ml.text(0.02, 0.93, "", transform=ax_ml.transAxes, fontsize=10)
+
+def init_ml():
+    line_e_ml.set_data([], [])
+    line_h_ml.set_data([], [])
+    time_txt_ml.set_text("")
+    return line_e_ml, line_h_ml, time_txt_ml
+
+
+def update_ml(i):
+    line_e_ml.set_data(x, frames_e_ml[i])
+    line_h_ml.set_data(xH, frames_h_ml[i])
+    time_txt_ml.set_text(f"t = {times_ml[i]:.3f}")
+    return line_e_ml, line_h_ml, time_txt_ml
+
+anim_ml = FuncAnimation(fig_ml, update_ml, frames=len(frames_e_ml),
+                        init_func=init_ml, interval=40, blit=True)
+plt.close(fig_ml)
+display(HTML(anim_ml.to_jshtml()))
 
 # %% [markdown]
 # ## 4. Parameter Study -- Effect of conductivity
