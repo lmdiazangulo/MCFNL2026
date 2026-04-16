@@ -3,15 +3,11 @@ import matplotlib.pyplot as plt
 import pytest
 from fdtd1d import FDTD1D, C, gaussian
 
-
-
-
 def test_fdtd_solves_basic_propagation():
     x = np.linspace(-1, 1, 201)
     x0 = 0.0
     sigma = 0.05
     initial_e = gaussian(x, x0, sigma)
-
     fdtd = FDTD1D(x)
     fdtd.load_initial_field(initial_e)
 
@@ -28,13 +24,11 @@ def test_fdtd_solves_basic_propagation():
 
     assert np.corrcoef(e_solved, e_expected)[0,1] > 0.99
 
-
 def test_fdtd_PEC_boundary_conditions():
     xMax = 1
     xMin = -1
     x = np.linspace(xMin, xMax, 201)
     boundaries = ('PEC', 'PEC')
-
     x0 = 0.0
     sigma = 0.05
     initial_e = gaussian(x, x0, sigma)
@@ -55,13 +49,11 @@ def test_fdtd_PEC_boundary_conditions():
     assert np.corrcoef(e_solved, e_expected)[0,1] > 0.99
     assert np.allclose(h_solved, h_expected, atol=0.01)
 
-
 def test_fdtd_periodic_boundary_conditions():
     xMax = 1
     xMin = -1
     x = np.linspace(xMin, xMax, 201)
     boundaries = ('periodic', 'periodic')
-
     x0 = 0.0
     sigma = 0.05
     initial_e = gaussian(x, x0, sigma)
@@ -89,7 +81,6 @@ def test_fdtd_PMC_boundary_conditions():
     x = np.linspace(xMin, xMax, 201)
     xH = (x[1:] + x[:-1]) / 2.0
     boundaries = ('PMC', 'PMC')
-    
     x0 = 0.0
     sigma = 0.05
     initial_h = gaussian(xH, x0, sigma)
@@ -282,7 +273,6 @@ def test_fdtd_mur_boundary_conditions():
     x = np.linspace(xMin, xMax, 201)
     xH = (x[1:] + x[:-1]) / 2.0
     boundaries = ('mur', 'mur')
-
     x0 = 0.0
     sigma = 0.05
 
@@ -306,7 +296,6 @@ def test_fdtd_dissipative_exact():
     xMax = 1.0
     xMin = -1.0
     L = xMax - xMin
-
     x = np.linspace(xMin, xMax, 201)
     xH = (x[1:] + x[:-1]) / 2.0
     boundaries = ('periodic', 'periodic')
@@ -319,10 +308,10 @@ def test_fdtd_dissipative_exact():
     fdtd = FDTD1D(x, boundaries)
     fdtd.load_initial_field(initial_e)
     fdtd.h = initial_h.copy()
-    
+
     sigma_val = 1.0
     eps_r_val = 2.0
-    
+
     fdtd.sig = np.full_like(x, sigma_val)       
     fdtd.eps_r = np.full_like(x, eps_r_val)
     fdtd.eps = fdtd.eps0 * fdtd.eps_r
@@ -336,7 +325,7 @@ def test_fdtd_dissipative_exact():
 
     e_solved = fdtd.get_e()
     h_solved = fdtd.get_h()
-    
+
     t_func_E = np.exp(-gamma * t_final) * (np.cos(wd * t_final) - (gamma / wd) * np.sin(wd * t_final))
     t_func_H = np.exp(-gamma * t_final) * (k / (fdtd.mu0 * wd)) * np.sin(wd * t_final)
 
