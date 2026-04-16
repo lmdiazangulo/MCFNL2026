@@ -30,6 +30,35 @@ class FDTD1D:
         self.pert = pert
         self.pert_dir = pert_dir
 
+        self.probes = []
+
+    def add_probe(self, x_pos, record_e=True, record_h=True):
+        idx_e = np.argmin(np.abs(self.x - x_pos))
+        idx_h = np.argmin(np.abs(self.xH - x_pos)) if len(self.xH) > 0 else 0
+        self.probes.append({
+            'x': x_pos,
+            'idx_e': idx_e,
+            'idx_h': idx_h,
+            'record_e': record_e,
+            'record_h': record_h,
+            'e_history': [],
+            'h_history': []
+        })
+
+    def clear_probes(self):
+        for p in self.probes:
+            p['e_history'] = []
+            p['h_history'] = []
+
+    def get_probe_data(self):
+        return [
+            {
+                'x': p['x'],
+                'e': np.array(p['e_history']),
+                'h': np.array(p['h_history'])
+            } for p in self.probes
+        ]
+
     def load_initial_field(self, e0):
         self.e = e0.copy()
 
